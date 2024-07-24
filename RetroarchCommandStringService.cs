@@ -1,15 +1,16 @@
 using System.Globalization;
-using System.Text;
 
 namespace OOT_AP_Client;
+
+// TODO: add checks that look for error messages
 
 // Response from Retroarch for reads looks like this: READ_CORE_MEMORY <address> 12 34 56...
 // Response from Retroarch for writes looks like this: WRITE_CORE_MEMORY <address> <number of bytes written>
 public static class RetroarchCommandStringService
 {
-	public static long ParseReadMemoryToLong(byte[] receivedBytes, bool isBigEndian)
+	public static long ParseReadMemoryToLong(string receivedString, bool isBigEndian)
 	{
-		var bytes = ParseReadMemoryToArray(receivedBytes: receivedBytes, isBigEndian: isBigEndian);
+		var bytes = ParseReadMemoryToArray(receivedString: receivedString, isBigEndian: isBigEndian);
 
 		var outputNumber = default(long);
 
@@ -24,10 +25,8 @@ public static class RetroarchCommandStringService
 		return outputNumber;
 	}
 
-	public static byte[] ParseReadMemoryToArray(byte[] receivedBytes, bool isBigEndian)
+	public static byte[] ParseReadMemoryToArray(string receivedString, bool isBigEndian)
 	{
-		var receivedString = Encoding.UTF8.GetString(receivedBytes);
-
 		var byteStrings = receivedString.Split(' ').Skip(2);
 
 		if (isBigEndian)
@@ -38,5 +37,12 @@ public static class RetroarchCommandStringService
 		return byteStrings
 			.Select((s) => byte.Parse(s: s, style: NumberStyles.HexNumber))
 			.ToArray();
+	}
+
+	public static int ParseWriteMemoryBytesWritten(string receivedString)
+	{
+		var bytesWrittenString = receivedString.Split(' ')[2];
+
+		return int.Parse(bytesWrittenString);
 	}
 }

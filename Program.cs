@@ -24,6 +24,11 @@ class Program
 			Console.Write($"{num:X} ");
 		}
 		Console.WriteLine();
+
+		var task3 = retroarchMemoryService.Write16(0x11A604, 495);
+		// var task3 = retroarchMemoryService.WriteByteArray(0x11A604, [0x01, 0xF4]);
+		task3.Wait();
+		Console.WriteLine(task3.Result);
 	}
 }
 

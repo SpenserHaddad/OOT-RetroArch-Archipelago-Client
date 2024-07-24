@@ -17,7 +17,7 @@ public class RetroarchMemoryService
 		var receivedBytes = await SendAndReceiveReadMemory(address: address, numberOfBytes: numberOfBytes);
 
 		var dataFromMemory = RetroarchCommandStringService.ParseReadMemoryToArray(
-			receivedBytes: receivedBytes,
+			receivedString: receivedBytes,
 			isBigEndian: true
 		);
 
@@ -44,28 +44,118 @@ public class RetroarchMemoryService
 		return await ReadMemoryToLong(address: address, numberOfBytes: 8);
 	}
 
+	// Input Array should be in little endian (eg 0x01F4 = 500 in base 10)
+	public async Task<int> WriteByteArray(int address, byte[] dataToWrite)
+	{
+		return await WriteMemory(address: address, dataToWrite: dataToWrite.Reverse().ToArray());
+	}
+
+	public async Task<int> Write8(int address, byte dataToWrite)
+	{
+		return await WriteMemory(
+			address: address,
+			dataToWrite: NumberToByteArray(number: dataToWrite, numberOfBytes: 1)
+		);
+	}
+
+	public async Task<int> Write16(int address, short dataToWrite)
+	{
+		return await WriteMemory(
+			address: address,
+			dataToWrite: NumberToByteArray(number: dataToWrite, numberOfBytes: 2)
+		);
+	}
+
+	public async Task<int> Write32(int address, int dataToWrite)
+	{
+		return await WriteMemory(
+			address: address,
+			dataToWrite: NumberToByteArray(number: dataToWrite, numberOfBytes: 4)
+		);
+	}
+
+	public async Task<int> Write64(int address, long dataToWrite)
+	{
+		return await WriteMemory(
+			address: address,
+			dataToWrite: NumberToByteArray(number: dataToWrite, numberOfBytes: 8)
+		);
+	}
+
 	// Max of 8 bytes at a time (since it's reading into a long)
 	private async Task<long> ReadMemoryToLong(int address, int numberOfBytes)
 	{
-		var receivedBytes = await SendAndReceiveReadMemory(address: address, numberOfBytes: numberOfBytes);
+		var receivedString = await SendAndReceiveReadMemory(address: address, numberOfBytes: numberOfBytes);
 
 		var dataFromMemory = RetroarchCommandStringService.ParseReadMemoryToLong(
-			receivedBytes: receivedBytes,
+			receivedString: receivedString,
 			isBigEndian: true
 		);
 
 		return dataFromMemory;
 	}
 
-	private async Task<byte[]> SendAndReceiveReadMemory(int address, int numberOfBytes)
+	private async Task<string> SendAndReceiveReadMemory(int address, int numberOfBytes)
+	{
+		var convertedAddress = ConvertAddressToN64(address: address, numberOfBytes: numberOfBytes);
+
+		_udpClient.Send(Encoding.UTF8.GetBytes($"READ_CORE_MEMORY {convertedAddress:X8} {numberOfBytes}"));
+
+		var receivedBytes = (await _udpClient.ReceiveAsync()).Buffer;
+
+		return Encoding.UTF8.GetString(receivedBytes);
+	}
+
+	private async Task<int> WriteMemory(int address, byte[] dataToWrite)
+	{
+		var receivedString = await SendAndReceiveWriteMemory(address: address, dataToWrite: dataToWrite);
+
+		var bytesWritten = RetroarchCommandStringService.ParseWriteMemoryBytesWritten(receivedString);
+
+		return bytesWritten;
+	}
+
+	private async Task<string> SendAndReceiveWriteMemory(int address, byte[] dataToWrite)
+	{
+		var convertedAddress = ConvertAddressToN64(address: address, numberOfBytes: dataToWrite.Length);
+
+		var dataToWriteString = string.Join(
+			separator: ' ',
+			values: dataToWrite.Select((b) => string.Format(format: "{0:X2}", arg0: b))
+		);
+
+		var str = $"WRITE_CORE_MEMORY {convertedAddress:X8} {dataToWriteString}";
+		var bytes = Encoding.UTF8.GetBytes(str);
+		_udpClient.Send(bytes);
+
+		var receivedBytes = (await _udpClient.ReceiveAsync()).Buffer;
+
+		return Encoding.UTF8.GetString(receivedBytes);
+	}
+
+	private int ConvertAddressToN64(int address, int numberOfBytes)
 	{
 		// Not sure of why, Bizhawk does this XOR 3 on addresses before using them when the memory is "swizzled"
 		// Also, this is reading big endian memory, which is why the offset is needed
 		// Result of this math is being able to use memory addresses from the lua script directly
 		var translatedAddress = (address | 3) - (numberOfBytes - 1);
 
-		_udpClient.Send(Encoding.UTF8.GetBytes($"READ_CORE_MEMORY {translatedAddress:X8} {numberOfBytes}"));
+		return translatedAddress;
+	}
 
-		return (await _udpClient.ReceiveAsync()).Buffer;
+	// Outputs big endian byte array
+	private byte[] NumberToByteArray(long number, int numberOfBytes)
+	{
+		var outputByteArray = new byte[numberOfBytes];
+
+		var offset = 8 * (numberOfBytes - 1);
+		for (var i = 0; i < numberOfBytes; i++)
+		{
+			outputByteArray[numberOfBytes - i - 1] = (byte)(number >> offset);
+
+			offset -= 8;
+		}
+
+		return outputByteArray.ToArray();
 	}
 }
