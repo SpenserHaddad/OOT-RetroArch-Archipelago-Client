@@ -1,34 +1,52 @@
 ﻿using System.Net.Sockets;
+using Archipelago.MultiClient.Net;
+using Archipelago.MultiClient.Net.Enums;
 
 namespace OOT_AP_Client;
 
-class Program
+internal class Program
 {
-	static void Main(string[] args)
+	private static void Main(string[] args)
 	{
 		var udpClient = new UdpClient();
-		udpClient.Connect("localhost", 55355);
+		udpClient.Connect(hostname: "localhost", port: 55355);
 
 		var retroarchMemoryService = new RetroarchMemoryService(udpClient);
+		var locationCheckService = new LocationCheckService(retroarchMemoryService);
 
-		var task = retroarchMemoryService.Read16(0x11A604);
+		var task = locationCheckService.GetAllCheckedLocationNames();
 		task.Wait();
-		
-		Console.WriteLine(task.Result);
+		var checkedLocationNames = task.Result;
 
-		var task2 = retroarchMemoryService.ReadByteArray(0x11F200, 4);
-		task2.Wait();
+		var apSession = ArchipelagoSessionFactory.CreateSession("localhost");
+		apSession.TryConnectAndLogin("Ocarina of Time", "EntissOOT", ItemsHandlingFlags.RemoteItems);
+		var checkedLocationIds = checkedLocationNames
+			.Select(
+				(locationName) => apSession.Locations.GetLocationIdFromName("Ocarina of Time", locationName)
+			)
+			.ToArray();
 
-		foreach (var num in task2.Result)
-		{
-			Console.Write($"{num:X} ");
-		}
-		Console.WriteLine();
+		apSession.Locations.CompleteLocationChecks(checkedLocationIds);
 
-		var task3 = retroarchMemoryService.Write16(0x11A604, 495);
-		// var task3 = retroarchMemoryService.WriteByteArray(0x11A604, [0x01, 0xF4]);
-		task3.Wait();
-		Console.WriteLine(task3.Result);
+		// var task = retroarchMemoryService.Read16(0xA011A604);
+		// task.Wait();
+		//
+		// Console.WriteLine(task.Result);
+		//
+		// var task2 = retroarchMemoryService.ReadByteArray(address: 0xA011F200, numberOfBytes: 4);
+		// task2.Wait();
+		//
+		// foreach (var num in task2.Result)
+		// {
+		// 	Console.Write($"{num:X} ");
+		// }
+		//
+		// Console.WriteLine();
+		//
+		// var task3 = retroarchMemoryService.Write16(address: 0xA011A604, dataToWrite: 495);
+		// // var task3 = retroarchMemoryService.WriteByteArray(0x11A604, [0x01, 0xF4]);
+		// task3.Wait();
+		// Console.WriteLine(task3.Result);
 	}
 }
 
@@ -54,7 +72,7 @@ class Program
  *  bitToCheck: int
  * }
  */
- 
+
 // Overall TODO:
 // Setup methods for reading and writing various sizes of data, as well as reading and writing byte[]s, this should abstract away the pointer swizzle and such
 // Setup code for checking the state of a location

@@ -2,7 +2,7 @@ using System.Globalization;
 
 namespace OOT_AP_Client;
 
-// TODO: add checks that look for error messages
+// TODO: add checks that look for error messages, the number after the address is -1 if it's an error, so detecting that case shouldn't be too hard
 
 // Response from Retroarch for reads looks like this: READ_CORE_MEMORY <address> 12 34 56...
 // Response from Retroarch for writes looks like this: WRITE_CORE_MEMORY <address> <number of bytes written>
@@ -27,7 +27,7 @@ public static class RetroarchCommandStringService
 
 	public static byte[] ParseReadMemoryToArray(string receivedString, bool isBigEndian)
 	{
-		var byteStrings = receivedString.Split(' ').Skip(2);
+		var byteStrings = receivedString.Trim().Split(' ').Skip(2);
 
 		if (isBigEndian)
 		{
@@ -41,7 +41,7 @@ public static class RetroarchCommandStringService
 
 	public static int ParseWriteMemoryBytesWritten(string receivedString)
 	{
-		var bytesWrittenString = receivedString.Split(' ')[2];
+		var bytesWrittenString = receivedString.Trim().Split(' ')[2];
 
 		return int.Parse(bytesWrittenString);
 	}

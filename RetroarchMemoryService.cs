@@ -12,7 +12,7 @@ public class RetroarchMemoryService
 		_udpClient = udpClient;
 	}
 
-	public async Task<byte[]> ReadByteArray(int address, int numberOfBytes)
+	public async Task<byte[]> ReadByteArray(uint address, int numberOfBytes)
 	{
 		var receivedBytes = await SendAndReceiveReadMemory(address: address, numberOfBytes: numberOfBytes);
 
@@ -24,33 +24,33 @@ public class RetroarchMemoryService
 		return dataFromMemory;
 	}
 
-	public async Task<byte> Read8(int address)
+	public async Task<byte> Read8(uint address)
 	{
 		return (byte)await ReadMemoryToLong(address: address, numberOfBytes: 1);
 	}
 
-	public async Task<short> Read16(int address)
+	public async Task<short> Read16(uint address)
 	{
 		return (short)await ReadMemoryToLong(address: address, numberOfBytes: 2);
 	}
 
-	public async Task<int> Read32(int address)
+	public async Task<int> Read32(uint address)
 	{
 		return (int)await ReadMemoryToLong(address: address, numberOfBytes: 4);
 	}
 
-	public async Task<long> Read64(int address)
+	public async Task<long> Read64(uint address)
 	{
 		return await ReadMemoryToLong(address: address, numberOfBytes: 8);
 	}
 
 	// Input Array should be in little endian (eg 0x01F4 = 500 in base 10)
-	public async Task<int> WriteByteArray(int address, byte[] dataToWrite)
+	public async Task<int> WriteByteArray(uint address, byte[] dataToWrite)
 	{
 		return await WriteMemory(address: address, dataToWrite: dataToWrite.Reverse().ToArray());
 	}
 
-	public async Task<int> Write8(int address, byte dataToWrite)
+	public async Task<int> Write8(uint address, byte dataToWrite)
 	{
 		return await WriteMemory(
 			address: address,
@@ -58,7 +58,7 @@ public class RetroarchMemoryService
 		);
 	}
 
-	public async Task<int> Write16(int address, short dataToWrite)
+	public async Task<int> Write16(uint address, short dataToWrite)
 	{
 		return await WriteMemory(
 			address: address,
@@ -66,7 +66,7 @@ public class RetroarchMemoryService
 		);
 	}
 
-	public async Task<int> Write32(int address, int dataToWrite)
+	public async Task<int> Write32(uint address, int dataToWrite)
 	{
 		return await WriteMemory(
 			address: address,
@@ -74,7 +74,7 @@ public class RetroarchMemoryService
 		);
 	}
 
-	public async Task<int> Write64(int address, long dataToWrite)
+	public async Task<int> Write64(uint address, long dataToWrite)
 	{
 		return await WriteMemory(
 			address: address,
@@ -83,7 +83,7 @@ public class RetroarchMemoryService
 	}
 
 	// Max of 8 bytes at a time (since it's reading into a long)
-	private async Task<long> ReadMemoryToLong(int address, int numberOfBytes)
+	private async Task<long> ReadMemoryToLong(uint address, int numberOfBytes)
 	{
 		var receivedString = await SendAndReceiveReadMemory(address: address, numberOfBytes: numberOfBytes);
 
@@ -95,7 +95,8 @@ public class RetroarchMemoryService
 		return dataFromMemory;
 	}
 
-	private async Task<string> SendAndReceiveReadMemory(int address, int numberOfBytes)
+	// TODO: might want a timeout waiting for the response here, need to look into why but i think it sometimes gets stuck waiting
+	private async Task<string> SendAndReceiveReadMemory(uint address, int numberOfBytes)
 	{
 		var convertedAddress = ConvertAddressToN64(address: address, numberOfBytes: numberOfBytes);
 
@@ -106,7 +107,7 @@ public class RetroarchMemoryService
 		return Encoding.UTF8.GetString(receivedBytes);
 	}
 
-	private async Task<int> WriteMemory(int address, byte[] dataToWrite)
+	private async Task<int> WriteMemory(uint address, byte[] dataToWrite)
 	{
 		var receivedString = await SendAndReceiveWriteMemory(address: address, dataToWrite: dataToWrite);
 
@@ -115,7 +116,7 @@ public class RetroarchMemoryService
 		return bytesWritten;
 	}
 
-	private async Task<string> SendAndReceiveWriteMemory(int address, byte[] dataToWrite)
+	private async Task<string> SendAndReceiveWriteMemory(uint address, byte[] dataToWrite)
 	{
 		var convertedAddress = ConvertAddressToN64(address: address, numberOfBytes: dataToWrite.Length);
 
@@ -133,12 +134,12 @@ public class RetroarchMemoryService
 		return Encoding.UTF8.GetString(receivedBytes);
 	}
 
-	private int ConvertAddressToN64(int address, int numberOfBytes)
+	private static uint ConvertAddressToN64(uint address, int numberOfBytes)
 	{
 		// Not sure of why, Bizhawk does this XOR 3 on addresses before using them when the memory is "swizzled"
 		// Also, this is reading big endian memory, which is why the offset is needed
 		// Result of this math is being able to use memory addresses from the lua script directly
-		var translatedAddress = (address | 3) - (numberOfBytes - 1);
+		var translatedAddress = (uint)((address | 3) - (numberOfBytes - 1));
 
 		return translatedAddress;
 	}
