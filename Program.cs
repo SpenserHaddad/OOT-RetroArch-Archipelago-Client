@@ -13,40 +13,55 @@ internal class Program
 
 		var retroarchMemoryService = new RetroarchMemoryService(udpClient);
 		var locationCheckService = new LocationCheckService(retroarchMemoryService);
-
-		var task = locationCheckService.GetAllCheckedLocationNames();
-		task.Wait();
-		var checkedLocationNames = task.Result;
+		var playerNameService = new PlayerNameService(retroarchMemoryService);
 
 		var apSession = ArchipelagoSessionFactory.CreateSession("localhost");
-		apSession.TryConnectAndLogin("Ocarina of Time", "EntissOOT", ItemsHandlingFlags.RemoteItems);
-		var checkedLocationIds = checkedLocationNames
-			.Select(
-				(locationName) => apSession.Locations.GetLocationIdFromName("Ocarina of Time", locationName)
-			)
-			.ToArray();
+		var loginResult = apSession.TryConnectAndLogin(
+			game: "Ocarina of Time",
+			name: "Player1",
+			itemsHandlingFlags: ItemsHandlingFlags.RemoteItems
+		);
+		// var loginResult = apSession.TryConnectAndLogin("Ocarina of Time", "Player2", ItemsHandlingFlags.RemoteItems);
 
-		apSession.Locations.CompleteLocationChecks(checkedLocationIds);
+		Console.WriteLine(loginResult.Successful ? "Connected to Archipelago" : "Failed to connect to Archipelago");
 
-		// var task = retroarchMemoryService.Read16(0xA011A604);
-		// task.Wait();
-		//
-		// Console.WriteLine(task.Result);
-		//
-		// var task2 = retroarchMemoryService.ReadByteArray(address: 0xA011F200, numberOfBytes: 4);
-		// task2.Wait();
-		//
-		// foreach (var num in task2.Result)
-		// {
-		// 	Console.Write($"{num:X} ");
-		// }
-		//
-		// Console.WriteLine();
-		//
-		// var task3 = retroarchMemoryService.Write16(address: 0xA011A604, dataToWrite: 495);
-		// // var task3 = retroarchMemoryService.WriteByteArray(0x11A604, [0x01, 0xF4]);
-		// task3.Wait();
-		// Console.WriteLine(task3.Result);
+		var playerNames = apSession.Players.AllPlayers.Skip(1).Select(x => x.Name);
+		var nameIndex = 1; // the names are 1 indexed, there's 8 bytes that never get used
+		foreach (var name in playerNames)
+		{
+			if (nameIndex >= 255)
+			{
+				break;
+			}
+
+			var task = playerNameService.WritePlayerName(index: (byte)nameIndex, name: name);
+			task.Wait();
+			nameIndex++;
+		}
+
+		playerNameService.WritePlayerName(index: 255, name: "APPlayer");
+		Console.WriteLine("Player names written");
+
+		while (true)
+		{
+			Task.Delay(500).Wait();
+			var task = locationCheckService.GetAllCheckedLocationNames();
+			task.Wait();
+			var checkedLocationNames = task.Result;
+
+			Console.WriteLine($"Checked locations: [{string.Join(separator: ", ", values: checkedLocationNames)}]");
+
+			var checkedLocationIds = checkedLocationNames
+				.Select(
+					(locationName) => apSession.Locations.GetLocationIdFromName(
+						game: "Ocarina of Time",
+						locationName: locationName
+					)
+				)
+				.ToArray();
+
+			apSession.Locations.CompleteLocationChecks(checkedLocationIds);
+		}
 	}
 }
 
@@ -59,25 +74,11 @@ internal class Program
 // Central methods that handle checking the state every little bit, maybe every half second?
 // Central method does stuff like deathlink, calling all location checks, and giving items (1 item at a time)
 
-// Would be nice to get things such that the values from the lua script can be directly used or directly translated
-
-// Setup I want to use for reading check states:
-// have a big data structure somewhere that defines each check
-// use an enum (or maybe I'll make a tiny Constant implementation) to say what type of check it is
-// the rest should be a structure that is generic for any type of check
-// may be as simple as this:
-/* {
- *	checkType: enum,
- *  offset: string,
- *  bitToCheck: int
- * }
- */
-
 // Overall TODO:
-// Setup methods for reading and writing various sizes of data, as well as reading and writing byte[]s, this should abstract away the pointer swizzle and such
-// Setup code for checking the state of a location
+// DONE Setup methods for reading and writing various sizes of data, as well as reading and writing byte[]s, this should abstract away the pointer swizzle and such
+// DONE (partially, only chests are setup) Setup code for checking the state of a location
 // Setup data structure and populate with all values from the lua script
-// Setup general code that runs every half second, omit receiving items and deathlinks as a start, just have sending out locations
+// DONE Setup general code that runs every half second, omit receiving items and deathlinks as a start, just have sending out locations
 // Setup receiving items
 // Setup deathlink
 // Setup any auxiliary stuff like writing player names as needed

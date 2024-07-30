@@ -12,6 +12,7 @@ public class RetroarchMemoryService
 		_udpClient = udpClient;
 	}
 
+	// for now don't read more than 4 bytes at a time, this won't work if you do
 	public async Task<byte[]> ReadByteArray(uint address, int numberOfBytes)
 	{
 		var receivedBytes = await SendAndReceiveReadMemory(address: address, numberOfBytes: numberOfBytes);
@@ -39,12 +40,14 @@ public class RetroarchMemoryService
 		return (int)await ReadMemoryToLong(address: address, numberOfBytes: 4);
 	}
 
+	// this won't work currently, doesn't use the swizzle properly, don't use it
 	public async Task<long> Read64(uint address)
 	{
 		return await ReadMemoryToLong(address: address, numberOfBytes: 8);
 	}
 
 	// Input Array should be in little endian (eg 0x01F4 = 500 in base 10)
+	// for now don't write more than 4 bytes at a time, this won't work if you do
 	public async Task<int> WriteByteArray(uint address, byte[] dataToWrite)
 	{
 		return await WriteMemory(address: address, dataToWrite: dataToWrite.Reverse().ToArray());
@@ -74,6 +77,7 @@ public class RetroarchMemoryService
 		);
 	}
 
+	// this won't work currently, doesn't use the swizzle properly, don't use it
 	public async Task<int> Write64(uint address, long dataToWrite)
 	{
 		return await WriteMemory(
@@ -139,6 +143,14 @@ public class RetroarchMemoryService
 		// Not sure of why, Bizhawk does this XOR 3 on addresses before using them when the memory is "swizzled"
 		// Also, this is reading big endian memory, which is why the offset is needed
 		// Result of this math is being able to use memory addresses from the lua script directly
+
+		// what if it's basically working in 4 byte chunks, the swizzle brings you to the end of the 4 byte chunk
+		// and then the idea is you read/write backwards starting from there
+		// so for things larger than 4 bytes, we would need to do them in separate 4 byte chunks, or handle the swizzle differently
+
+		// yeah, the swizzle basically reverses the address within a 4 byte chunk, so 0 -> 3, 1 -> 2, 2 -> 1, 3 -> 0, 4 -> 7, etc.
+		// need to refactor memory handling at some point to work with this
+
 		var translatedAddress = (uint)((address | 3) - (numberOfBytes - 1));
 
 		return translatedAddress;
