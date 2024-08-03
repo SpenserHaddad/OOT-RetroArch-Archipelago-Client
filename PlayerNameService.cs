@@ -16,7 +16,7 @@ public class PlayerNameService
 		const uint namesAddress = 0x80400034;
 		const byte maxPlayerNameBytes = 8;
 
-		var nameToWriteAddress = namesAddress + (index * maxPlayerNameBytes);
+		var nameToWriteAddress = namesAddress + index * maxPlayerNameBytes;
 		var bytesToWrite = new List<byte>(8);
 
 		var asciiNameCharBytes = Encoding.ASCII.GetBytes(name);
@@ -27,30 +27,16 @@ public class PlayerNameService
 				? asciiNameCharBytes[i]
 				: null;
 
-			switch (charByte)
+			charByte = charByte switch
 			{
-				case >= 0x30 and <= 0x39: // 0 to 9
-					charByte -= 0x30;
-					break;
-				case >= 0x41 and <= 0x5A: // A to Z
-					charByte += 0x6A;
-					break;
-				case >= 0x61 and <= 0x7A: // a to z
-					charByte += 0x64;
-					break;
-				case 0x2E: // .
-					charByte = 0xEA;
-					break;
-				case 0x2D: // -
-					charByte = 0xE4;
-					break;
-				case 0x20: // <space>
-					charByte = 0xDF;
-					break;
-				default:
-					charByte = null;
-					break;
-			}
+				>= 0x30 and <= 0x39 => (byte)(charByte - 0x30), // 0 to 9
+				>= 0x41 and <= 0x5A => (byte)(charByte + 0x6A), // A to Z
+				>= 0x61 and <= 0x7A => (byte)(charByte + 0x64), // a to z
+				0x2E => 0xEA, // .
+				0x2D => 0xE4, // -
+				0x20 => 0xDF, // <space>
+				_ => null,
+			};
 
 			if (charByte is null && hasMoreCharacters)
 			{

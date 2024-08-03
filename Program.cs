@@ -14,6 +14,7 @@ internal class Program
 		var retroarchMemoryService = new RetroarchMemoryService(udpClient);
 		var locationCheckService = new LocationCheckService(retroarchMemoryService);
 		var playerNameService = new PlayerNameService(retroarchMemoryService);
+		var receiveItemService = new ReceiveItemService(retroarchMemoryService);
 
 		var apSession = ArchipelagoSessionFactory.CreateSession("localhost");
 		var loginResult = apSession.TryConnectAndLogin(
@@ -21,7 +22,11 @@ internal class Program
 			name: "Player1",
 			itemsHandlingFlags: ItemsHandlingFlags.RemoteItems
 		);
-		// var loginResult = apSession.TryConnectAndLogin("Ocarina of Time", "Player2", ItemsHandlingFlags.RemoteItems);
+		// var loginResult = apSession.TryConnectAndLogin(
+		// 	game: "Ocarina of Time",
+		// 	name: "Player2",
+		// 	itemsHandlingFlags: ItemsHandlingFlags.RemoteItems
+		// );
 
 		Console.WriteLine(loginResult.Successful ? "Connected to Archipelago" : "Failed to connect to Archipelago");
 
@@ -39,7 +44,8 @@ internal class Program
 			nameIndex++;
 		}
 
-		playerNameService.WritePlayerName(index: 255, name: "APPlayer");
+		var applayerNameTask = playerNameService.WritePlayerName(index: 255, name: "APPlayer");
+		applayerNameTask.Wait();
 		Console.WriteLine("Player names written");
 
 		while (true)
@@ -49,7 +55,6 @@ internal class Program
 			task.Wait();
 			var checkedLocationNames = task.Result;
 
-			Console.WriteLine($"Checked locations: [{string.Join(separator: ", ", values: checkedLocationNames)}]");
 
 			var checkedLocationIds = checkedLocationNames
 				.Select(
@@ -61,6 +66,15 @@ internal class Program
 				.ToArray();
 
 			apSession.Locations.CompleteLocationChecks(checkedLocationIds);
+
+			var localReceivedItemsCountTask = receiveItemService.GetLocalReceivedItemIndex();
+			localReceivedItemsCountTask.Wait();
+			if (apSession.Items.Index > localReceivedItemsCountTask.Result)
+			{
+				var itemToReceive = apSession.Items.AllItemsReceived[localReceivedItemsCountTask.Result];
+				var receiveItemTask = receiveItemService.ReceiveItem(itemToReceive);
+				receiveItemTask.Wait();
+			}
 		}
 	}
 }
@@ -82,3 +96,11 @@ internal class Program
 // Setup receiving items
 // Setup deathlink
 // Setup any auxiliary stuff like writing player names as needed
+
+// Performance improvement idea:
+// what if, instead of checking both temp context and save context every time, we only check temp context
+// the temp context check could be a lot quicker, we could look at the scene first and then look at the id, so we could use a nested dictionary or something
+// could construct that data structure on startup and store into a static variable, or process it in advance and serialize it, but it's probably not going to take long
+// then, on a less frequent interval, we could check the full save context, maybe every 10 or 30 seconds
+// could also grab save context data in a large chunk (eg all of the data for one area) and then process it
+// save this for after v1

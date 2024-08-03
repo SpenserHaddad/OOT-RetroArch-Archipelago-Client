@@ -51,7 +51,7 @@ public class LocationCheckService
 			),
 			_ => throw new InvalidOperationException(
 				$"Unknown LocationType {locationInformation.Type} for location {locationInformation.Name}"
-			)
+			),
 		};
 	}
 
@@ -81,7 +81,12 @@ public class LocationCheckService
 		return ((nearbyMemory >> bitToCheck) & 1) == 1;
 	}
 
-	private bool OutgoingKeyCheck(byte[] outgoingItemKey, byte sceneOffset, byte bitToCheck, byte ootrLocationType)
+	private static bool OutgoingKeyCheck(
+		byte[] outgoingItemKey,
+		byte sceneOffset,
+		byte bitToCheck,
+		byte ootrLocationType
+	)
 	{
 		return outgoingItemKey[0] == sceneOffset && outgoingItemKey[1] == ootrLocationType &&
 			outgoingItemKey[3] == bitToCheck;

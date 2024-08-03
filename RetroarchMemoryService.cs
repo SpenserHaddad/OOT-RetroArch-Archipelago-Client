@@ -157,7 +157,7 @@ public class RetroarchMemoryService
 	}
 
 	// Outputs big endian byte array
-	private byte[] NumberToByteArray(long number, int numberOfBytes)
+	private static byte[] NumberToByteArray(long number, int numberOfBytes)
 	{
 		var outputByteArray = new byte[numberOfBytes];
 
