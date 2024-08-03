@@ -15,6 +15,7 @@ internal class Program
 		var locationCheckService = new LocationCheckService(retroarchMemoryService);
 		var playerNameService = new PlayerNameService(retroarchMemoryService);
 		var receiveItemService = new ReceiveItemService(retroarchMemoryService);
+		var gameModeService = new GameModeService(retroarchMemoryService);
 
 		var apSession = ArchipelagoSessionFactory.CreateSession("localhost");
 		var loginResult = apSession.TryConnectAndLogin(
@@ -55,7 +56,6 @@ internal class Program
 			task.Wait();
 			var checkedLocationNames = task.Result;
 
-
 			var checkedLocationIds = checkedLocationNames
 				.Select(
 					(locationName) => apSession.Locations.GetLocationIdFromName(
@@ -64,7 +64,6 @@ internal class Program
 					)
 				)
 				.ToArray();
-
 			apSession.Locations.CompleteLocationChecks(checkedLocationIds);
 
 			var localReceivedItemsCountTask = receiveItemService.GetLocalReceivedItemIndex();
@@ -75,6 +74,10 @@ internal class Program
 				var receiveItemTask = receiveItemService.ReceiveItem(itemToReceive);
 				receiveItemTask.Wait();
 			}
+
+			var gameModeTask = gameModeService.GetCurrentGameMode();
+			gameModeTask.Wait();
+			Console.WriteLine($"{{ {gameModeTask.Result.Name}, {gameModeTask.Result.IsInGame} }}");
 		}
 	}
 }
@@ -104,3 +107,9 @@ internal class Program
 // then, on a less frequent interval, we could check the full save context, maybe every 10 or 30 seconds
 // could also grab save context data in a large chunk (eg all of the data for one area) and then process it
 // save this for after v1
+
+// idea for sending local items:
+// could have a sort of local database of checked locations, might want that anyway for performance reasons
+// any location in the local save file that is checked would be in there, but if you make a new save then there could be locations checked in the multiworld that aren't marked as checked in the local database
+// the idea would be that when processing the item queue, we can check against the local database, if the location is marked as checked there then that means we don't give the item, if it's not marked as checked then we do give the item
+// this would avoid giving duplicate items but mean we can receive local items when making a new save file
