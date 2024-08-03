@@ -151,7 +151,7 @@ public class RetroarchMemoryService
 		// yeah, the swizzle basically reverses the address within a 4 byte chunk, so 0 -> 3, 1 -> 2, 2 -> 1, 3 -> 0, 4 -> 7, etc.
 		// need to refactor memory handling at some point to work with this
 
-		var translatedAddress = (uint)((address | 3) - (numberOfBytes - 1));
+		var translatedAddress = (uint)((address ^ 3) - (numberOfBytes - 1));
 
 		return translatedAddress;
 	}
