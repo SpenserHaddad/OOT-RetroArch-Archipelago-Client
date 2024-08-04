@@ -2,19 +2,6 @@ namespace OOT_AP_Client;
 
 public class GameModeService
 {
-	private static readonly Dictionary<string, GameMode> GameModes = new GameMode[]
-	{
-		new(name: "N64 Logo", isInGame: false),
-		new(name: "Title Screen", isInGame: false),
-		new(name: "File Select", isInGame: false),
-		new(name: "Dying", isInGame: true),
-		new(name: "Cutscene", isInGame: true),
-		new(name: "Normal Gameplay", isInGame: true),
-		new(name: "Paused", isInGame: true),
-		new(name: "Dying Menu Start", isInGame: false),
-		new(name: "Dead", isInGame: false),
-	}.ToDictionary((gameMode) => gameMode.Name);
-
 	private readonly RetroarchMemoryService _retroarchMemoryService;
 
 	public GameModeService(RetroarchMemoryService retroarchMemoryService)
@@ -105,6 +92,20 @@ public class GameModeService
 
 		return (linkState & 0x00000080) > 0 && linkHealth == 0;
 	}
+
+	// TODO: Change the names to be an enum
+	private static readonly Dictionary<string, GameMode> GameModes = new GameMode[]
+	{
+		new(name: "N64 Logo", isInGame: false),
+		new(name: "Title Screen", isInGame: false),
+		new(name: "File Select", isInGame: false),
+		new(name: "Dying", isInGame: true),
+		new(name: "Cutscene", isInGame: true),
+		new(name: "Normal Gameplay", isInGame: true),
+		new(name: "Paused", isInGame: true),
+		new(name: "Dying Menu Start", isInGame: false),
+		new(name: "Dead", isInGame: false),
+	}.ToDictionary((gameMode) => gameMode.Name);
 }
 
 public record GameMode

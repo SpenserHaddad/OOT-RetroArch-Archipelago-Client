@@ -4,7 +4,6 @@ namespace OOT_AP_Client;
 
 public class ReceiveItemService
 {
-	private static readonly HashSet<ushort> ShopScenes = [0x2C, 0x2D, 0x2E, 0x2F, 0x30, 0x31, 0x32, 0x33, 0x42, 0x4B];
 	private readonly CurrentSceneService _currentSceneService;
 	private readonly RetroarchMemoryService _retroarchMemoryService;
 
@@ -35,4 +34,6 @@ public class ReceiveItemService
 		await _retroarchMemoryService.Write16(address: incomingPlayerAddress, dataToWrite: 0x00);
 		await _retroarchMemoryService.Write16(address: incomingItemAddress, dataToWrite: (short)(item.ItemId - 66000));
 	}
+
+	private static readonly HashSet<ushort> ShopScenes = [0x2C, 0x2D, 0x2E, 0x2F, 0x30, 0x31, 0x32, 0x33, 0x42, 0x4B];
 }
