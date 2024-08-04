@@ -105,23 +105,16 @@ while (true)
 	}
 }
 
-// This works for reading data, writing should be the same idea
-// Can abstract this code into a class
-
-// Can use a similar structure as the lua script:
-// Generic methods for reading different kinds of checks (one class for these, static methods)
-// Methods per region of the map that define all the checks for that region
-// Central methods that handle checking the state every little bit, maybe every half second?
-// Central method does stuff like deathlink, calling all location checks, and giving items (1 item at a time)
-
 // Overall TODO:
 // DONE Setup methods for reading and writing various sizes of data, as well as reading and writing byte[]s, this should abstract away the pointer swizzle and such
 // DONE (partially, only chests are setup) Setup code for checking the state of a location
-// Setup data structure and populate with all values from the lua script
 // DONE Setup general code that runs every half second, omit receiving items and deathlinks as a start, just have sending out locations
-// Setup receiving items
-// Setup deathlink
-// Setup any auxiliary stuff like writing player names as needed
+// DONE Setup receiving items
+// DONE Setup deathlink
+// DONE Setup writing player names
+// Setup game completion
+// Setup regular location checking and all locations
+// Setup collectible locations
 
 // Performance improvement idea:
 // what if, instead of checking both temp context and save context every time, we only check temp context
