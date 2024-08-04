@@ -4,11 +4,14 @@ namespace OOT_AP_Client;
 
 public class ReceiveItemService
 {
+	private static readonly HashSet<ushort> ShopScenes = [0x2C, 0x2D, 0x2E, 0x2F, 0x30, 0x31, 0x32, 0x33, 0x42, 0x4B];
+	private readonly CurrentSceneService _currentSceneService;
 	private readonly RetroarchMemoryService _retroarchMemoryService;
 
-	public ReceiveItemService(RetroarchMemoryService retroarchMemoryService)
+	public ReceiveItemService(RetroarchMemoryService retroarchMemoryService, CurrentSceneService currentSceneService)
 	{
 		_retroarchMemoryService = retroarchMemoryService;
+		_currentSceneService = currentSceneService;
 	}
 
 	public async Task<short> GetLocalReceivedItemIndex()
@@ -21,6 +24,11 @@ public class ReceiveItemService
 
 	public async Task ReceiveItem(ItemInfo item)
 	{
+		if (ShopScenes.Contains(await _currentSceneService.GetCurrentScene()))
+		{
+			return;
+		}
+
 		const uint incomingPlayerAddress = 0xA0400026;
 		const uint incomingItemAddress = 0xA0400028;
 

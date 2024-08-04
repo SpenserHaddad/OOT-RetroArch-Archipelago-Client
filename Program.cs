@@ -14,7 +14,11 @@ internal class Program
 		var retroarchMemoryService = new RetroarchMemoryService(udpClient);
 		var locationCheckService = new LocationCheckService(retroarchMemoryService);
 		var playerNameService = new PlayerNameService(retroarchMemoryService);
-		var receiveItemService = new ReceiveItemService(retroarchMemoryService);
+		var currentSceneService = new CurrentSceneService(retroarchMemoryService);
+		var receiveItemService = new ReceiveItemService(
+			retroarchMemoryService: retroarchMemoryService,
+			currentSceneService: currentSceneService
+		);
 		var gameModeService = new GameModeService(retroarchMemoryService);
 
 		var apSession = ArchipelagoSessionFactory.CreateSession("localhost");
