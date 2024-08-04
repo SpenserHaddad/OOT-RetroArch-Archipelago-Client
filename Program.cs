@@ -1,89 +1,82 @@
 ﻿using System.Net.Sockets;
 using Archipelago.MultiClient.Net;
 using Archipelago.MultiClient.Net.Enums;
+using OOT_AP_Client;
 
-namespace OOT_AP_Client;
+var udpClient = new UdpClient();
+udpClient.Connect(hostname: "localhost", port: 55355);
 
-internal class Program
+var retroarchMemoryService = new RetroarchMemoryService(udpClient);
+var locationCheckService = new LocationCheckService(retroarchMemoryService);
+var playerNameService = new PlayerNameService(retroarchMemoryService);
+var currentSceneService = new CurrentSceneService(retroarchMemoryService);
+var receiveItemService = new ReceiveItemService(
+	retroarchMemoryService: retroarchMemoryService,
+	currentSceneService: currentSceneService
+);
+var gameModeService = new GameModeService(retroarchMemoryService);
+
+var apSession = ArchipelagoSessionFactory.CreateSession("localhost");
+var loginResult = apSession.TryConnectAndLogin(
+	game: "Ocarina of Time",
+	name: "Player1",
+	itemsHandlingFlags: ItemsHandlingFlags.RemoteItems
+);
+// var loginResult = apSession.TryConnectAndLogin(
+// 	game: "Ocarina of Time",
+// 	name: "Player2",
+// 	itemsHandlingFlags: ItemsHandlingFlags.RemoteItems
+// );
+
+Console.WriteLine(loginResult.Successful ? "Connected to Archipelago" : "Failed to connect to Archipelago");
+
+var playerNames = apSession.Players.AllPlayers.Skip(1).Select(x => x.Name);
+var nameIndex = 1; // the names are 1 indexed, there's 8 bytes that never get used
+foreach (var name in playerNames)
 {
-	private static void Main(string[] args)
+	if (nameIndex >= 255)
 	{
-		var udpClient = new UdpClient();
-		udpClient.Connect(hostname: "localhost", port: 55355);
-
-		var retroarchMemoryService = new RetroarchMemoryService(udpClient);
-		var locationCheckService = new LocationCheckService(retroarchMemoryService);
-		var playerNameService = new PlayerNameService(retroarchMemoryService);
-		var currentSceneService = new CurrentSceneService(retroarchMemoryService);
-		var receiveItemService = new ReceiveItemService(
-			retroarchMemoryService: retroarchMemoryService,
-			currentSceneService: currentSceneService
-		);
-		var gameModeService = new GameModeService(retroarchMemoryService);
-
-		var apSession = ArchipelagoSessionFactory.CreateSession("localhost");
-		var loginResult = apSession.TryConnectAndLogin(
-			game: "Ocarina of Time",
-			name: "Player1",
-			itemsHandlingFlags: ItemsHandlingFlags.RemoteItems
-		);
-		// var loginResult = apSession.TryConnectAndLogin(
-		// 	game: "Ocarina of Time",
-		// 	name: "Player2",
-		// 	itemsHandlingFlags: ItemsHandlingFlags.RemoteItems
-		// );
-
-		Console.WriteLine(loginResult.Successful ? "Connected to Archipelago" : "Failed to connect to Archipelago");
-
-		var playerNames = apSession.Players.AllPlayers.Skip(1).Select(x => x.Name);
-		var nameIndex = 1; // the names are 1 indexed, there's 8 bytes that never get used
-		foreach (var name in playerNames)
-		{
-			if (nameIndex >= 255)
-			{
-				break;
-			}
-
-			var task = playerNameService.WritePlayerName(index: (byte)nameIndex, name: name);
-			task.Wait();
-			nameIndex++;
-		}
-
-		var applayerNameTask = playerNameService.WritePlayerName(index: 255, name: "APPlayer");
-		applayerNameTask.Wait();
-		Console.WriteLine("Player names written");
-
-		while (true)
-		{
-			Task.Delay(500).Wait();
-			var task = locationCheckService.GetAllCheckedLocationNames();
-			task.Wait();
-			var checkedLocationNames = task.Result;
-
-			var checkedLocationIds = checkedLocationNames
-				.Select(
-					(locationName) => apSession.Locations.GetLocationIdFromName(
-						game: "Ocarina of Time",
-						locationName: locationName
-					)
-				)
-				.ToArray();
-			apSession.Locations.CompleteLocationChecks(checkedLocationIds);
-
-			var localReceivedItemsCountTask = receiveItemService.GetLocalReceivedItemIndex();
-			localReceivedItemsCountTask.Wait();
-			if (apSession.Items.Index > localReceivedItemsCountTask.Result)
-			{
-				var itemToReceive = apSession.Items.AllItemsReceived[localReceivedItemsCountTask.Result];
-				var receiveItemTask = receiveItemService.ReceiveItem(itemToReceive);
-				receiveItemTask.Wait();
-			}
-
-			var gameModeTask = gameModeService.GetCurrentGameMode();
-			gameModeTask.Wait();
-			Console.WriteLine($"{{ {gameModeTask.Result.Name}, {gameModeTask.Result.IsInGame} }}");
-		}
+		break;
 	}
+
+	var task = playerNameService.WritePlayerName(index: (byte)nameIndex, name: name);
+	task.Wait();
+	nameIndex++;
+}
+
+var applayerNameTask = playerNameService.WritePlayerName(index: 255, name: "APPlayer");
+applayerNameTask.Wait();
+Console.WriteLine("Player names written");
+
+while (true)
+{
+	Task.Delay(500).Wait();
+	var task = locationCheckService.GetAllCheckedLocationNames();
+	task.Wait();
+	var checkedLocationNames = task.Result;
+
+	var checkedLocationIds = checkedLocationNames
+		.Select(
+			(locationName) => apSession.Locations.GetLocationIdFromName(
+				game: "Ocarina of Time",
+				locationName: locationName
+			)
+		)
+		.ToArray();
+	apSession.Locations.CompleteLocationChecks(checkedLocationIds);
+
+	var localReceivedItemsCountTask = receiveItemService.GetLocalReceivedItemIndex();
+	localReceivedItemsCountTask.Wait();
+	if (apSession.Items.Index > localReceivedItemsCountTask.Result)
+	{
+		var itemToReceive = apSession.Items.AllItemsReceived[localReceivedItemsCountTask.Result];
+		var receiveItemTask = receiveItemService.ReceiveItem(itemToReceive);
+		receiveItemTask.Wait();
+	}
+
+	var gameModeTask = gameModeService.GetCurrentGameMode();
+	gameModeTask.Wait();
+	Console.WriteLine($"{{ {gameModeTask.Result.Name}, {gameModeTask.Result.IsInGame} }}");
 }
 
 // This works for reading data, writing should be the same idea
