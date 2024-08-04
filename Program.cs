@@ -1,7 +1,9 @@
 ﻿using System.Net.Sockets;
 using Archipelago.MultiClient.Net;
+using Archipelago.MultiClient.Net.BounceFeatures.DeathLink;
 using Archipelago.MultiClient.Net.Enums;
 using OOT_AP_Client;
+using DeathLinkService = OOT_AP_Client.DeathLinkService;
 
 var udpClient = new UdpClient();
 udpClient.Connect(hostname: "localhost", port: 55355);
@@ -15,18 +17,21 @@ var receiveItemService = new ReceiveItemService(
 	currentSceneService: currentSceneService
 );
 var gameModeService = new GameModeService(retroarchMemoryService);
+var deathLinkService = new DeathLinkService(
+	retroarchMemoryService: retroarchMemoryService,
+	gameModeService: gameModeService,
+	currentSceneService: currentSceneService
+);
 
 var apSession = ArchipelagoSessionFactory.CreateSession("localhost");
+var playerName = "Player1";
+// var playerName = "Player2";
 var loginResult = apSession.TryConnectAndLogin(
 	game: "Ocarina of Time",
-	name: "Player1",
+	name: playerName,
 	itemsHandlingFlags: ItemsHandlingFlags.RemoteItems
 );
-// var loginResult = apSession.TryConnectAndLogin(
-// 	game: "Ocarina of Time",
-// 	name: "Player2",
-// 	itemsHandlingFlags: ItemsHandlingFlags.RemoteItems
-// );
+var archipelagoDeathLinkService = apSession.CreateDeathLinkService();
 
 Console.WriteLine(loginResult.Successful ? "Connected to Archipelago" : "Failed to connect to Archipelago");
 
@@ -47,6 +52,21 @@ foreach (var name in playerNames)
 var applayerNameTask = playerNameService.WritePlayerName(index: 255, name: "APPlayer");
 applayerNameTask.Wait();
 Console.WriteLine("Player names written");
+
+var deathLinkEnabledTask = deathLinkService.SetDeathLinkEnabled();
+deathLinkEnabledTask.Wait();
+var deathLinkEnabled = deathLinkService.DeathLinkEnabled;
+Console.WriteLine($"DeathLink {(deathLinkEnabled ? "is" : "is not")} enabled.");
+
+if (deathLinkEnabled)
+{
+	archipelagoDeathLinkService.EnableDeathLink();
+	archipelagoDeathLinkService.OnDeathLinkReceived += (_) =>
+	{
+		deathLinkService.ReceiveDeathLink();
+		Console.WriteLine("Death link received");
+	};
+}
 
 while (true)
 {
@@ -74,9 +94,15 @@ while (true)
 		receiveItemTask.Wait();
 	}
 
-	var gameModeTask = gameModeService.GetCurrentGameMode();
-	gameModeTask.Wait();
-	Console.WriteLine($"{{ {gameModeTask.Result.Name}, {gameModeTask.Result.IsInGame} }}");
+	var processDeathLinkTask = deathLinkService.ProcessDeathLink();
+	processDeathLinkTask.Wait();
+
+	if (deathLinkService.ShouldSendDeathLink())
+	{
+		var deathLink = new DeathLink(playerName);
+		archipelagoDeathLinkService.SendDeathLink(deathLink);
+		Console.WriteLine("Death link sent.");
+	}
 }
 
 // This works for reading data, writing should be the same idea
