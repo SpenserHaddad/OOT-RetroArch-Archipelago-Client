@@ -2,6 +2,7 @@
 using Archipelago.MultiClient.Net;
 using Archipelago.MultiClient.Net.BounceFeatures.DeathLink;
 using Archipelago.MultiClient.Net.Enums;
+using Newtonsoft.Json.Linq;
 using OOT_AP_Client;
 using DeathLinkService = OOT_AP_Client.DeathLinkService;
 
@@ -22,6 +23,7 @@ var deathLinkService = new DeathLinkService(
 	gameModeService: gameModeService,
 	currentSceneService: currentSceneService
 );
+var gameCompleteService = new GameCompleteService(retroarchMemoryService);
 
 var apSession = ArchipelagoSessionFactory.CreateSession("localhost");
 var playerName = "Player1";
@@ -31,12 +33,23 @@ var loginResult = apSession.TryConnectAndLogin(
 	name: playerName,
 	itemsHandlingFlags: ItemsHandlingFlags.RemoteItems
 );
+
+if (!loginResult.Successful)
+{
+	Console.WriteLine("Connection to Archipelago failed, exiting.");
+}
+
+Console.WriteLine("Connected to Archipelago");
+
 var archipelagoDeathLinkService = apSession.CreateDeathLinkService();
 
-Console.WriteLine(loginResult.Successful ? "Connected to Archipelago" : "Failed to connect to Archipelago");
+var slotData = apSession.DataStorage.GetSlotData();
+var slotSettings = new SlotSettings((long)slotData["shuffle_scrubs"] == 1);
+var collectibleOverridesFlagsAddress = (long)slotData["collectible_override_flags"];
+var collectibleFlagOffsets = SlotDataCollectableFlagOffsetsToArray((JObject)slotData["collectible_flag_offsets"]);
 
 var playerNames = apSession.Players.AllPlayers.Skip(1).Select(x => x.Name);
-var nameIndex = 1; // the names are 1 indexed, there's 8 bytes that never get used
+var nameIndex = 1; // the names are 1 indexed, nothing is stored at index 0
 foreach (var name in playerNames)
 {
 	if (nameIndex >= 255)
@@ -58,6 +71,8 @@ deathLinkEnabledTask.Wait();
 var deathLinkEnabled = deathLinkService.DeathLinkEnabled;
 Console.WriteLine($"DeathLink {(deathLinkEnabled ? "is" : "is not")} enabled.");
 
+var isGameCompletionSent = false;
+
 if (deathLinkEnabled)
 {
 	archipelagoDeathLinkService.EnableDeathLink();
@@ -71,7 +86,7 @@ if (deathLinkEnabled)
 while (true)
 {
 	Task.Delay(500).Wait();
-	var task = locationCheckService.GetAllCheckedLocationNames();
+	var task = locationCheckService.GetAllCheckedLocationNames(slotSettings);
 	task.Wait();
 	var checkedLocationNames = task.Result;
 
@@ -103,6 +118,18 @@ while (true)
 		archipelagoDeathLinkService.SendDeathLink(deathLink);
 		Console.WriteLine("Death link sent.");
 	}
+
+	if (!isGameCompletionSent)
+	{
+		var isGameCompleteTask = gameCompleteService.IsGameComplete();
+		isGameCompleteTask.Wait();
+		if (isGameCompleteTask.Result)
+		{
+			apSession.SetGoalAchieved();
+			isGameCompletionSent = true;
+			Console.WriteLine("Game completed");
+		}
+	}
 }
 
 // Overall TODO:
@@ -129,3 +156,27 @@ while (true)
 // any location in the local save file that is checked would be in there, but if you make a new save then there could be locations checked in the multiworld that aren't marked as checked in the local database
 // the idea would be that when processing the item queue, we can check against the local database, if the location is marked as checked there then that means we don't give the item, if it's not marked as checked then we do give the item
 // this would avoid giving duplicate items but mean we can receive local items when making a new save file
+
+static List<CollectibleFlagOffset> SlotDataCollectableFlagOffsetsToArray(JObject slotDataCollectibleFlagOffsets)
+{
+	var convertedCollectibleFlagOffsets = new List<CollectibleFlagOffset>(slotDataCollectibleFlagOffsets.Count);
+
+	foreach (var flagOffsetData in slotDataCollectibleFlagOffsets)
+	{
+		var itemId = uint.Parse(flagOffsetData.Key);
+
+		var jArray = flagOffsetData.Value as JArray;
+		if (jArray is null)
+		{
+			Console.WriteLine("Null JArray in collectible flag offsets, this shouldn't happen!");
+			continue;
+		}
+
+		var offset = jArray[0].Value<uint>();
+		var flag = jArray[1].Value<uint>();
+
+		convertedCollectibleFlagOffsets.Add(new CollectibleFlagOffset(itemId: itemId, offset: offset, flag: flag));
+	}
+
+	return convertedCollectibleFlagOffsets;
+}
