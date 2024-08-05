@@ -1,7 +1,7 @@
 using System.Net.Sockets;
 using System.Text;
 
-namespace OOT_AP_Client;
+namespace OOT_AP_Client.Services;
 
 public class RetroarchMemoryService
 {

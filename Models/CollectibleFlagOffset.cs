@@ -1,4 +1,4 @@
-namespace OOT_AP_Client;
+namespace OOT_AP_Client.Models;
 
 public record CollectibleFlagOffset
 {

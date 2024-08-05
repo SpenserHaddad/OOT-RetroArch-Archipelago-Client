@@ -1,4 +1,6 @@
-namespace OOT_AP_Client;
+using OOT_AP_Client.Models;
+
+namespace OOT_AP_Client.Data;
 
 public static class AllLocationInformation
 {

@@ -1,6 +1,6 @@
 using System.Globalization;
 
-namespace OOT_AP_Client;
+namespace OOT_AP_Client.Services;
 
 // TODO: add checks that look for error messages, the number after the address is -1 if it's an error, so detecting that case shouldn't be too hard
 

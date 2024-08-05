@@ -3,8 +3,9 @@ using Archipelago.MultiClient.Net;
 using Archipelago.MultiClient.Net.BounceFeatures.DeathLink;
 using Archipelago.MultiClient.Net.Enums;
 using Newtonsoft.Json.Linq;
-using OOT_AP_Client;
-using DeathLinkService = OOT_AP_Client.DeathLinkService;
+using OOT_AP_Client.Models;
+using OOT_AP_Client.Services;
+using DeathLinkService = OOT_AP_Client.Services.DeathLinkService;
 
 var udpClient = new UdpClient();
 udpClient.Connect(hostname: "localhost", port: 55355);

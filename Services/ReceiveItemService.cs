@@ -1,6 +1,6 @@
 using Archipelago.MultiClient.Net.Models;
 
-namespace OOT_AP_Client;
+namespace OOT_AP_Client.Services;
 
 public class ReceiveItemService
 {
