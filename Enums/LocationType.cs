@@ -1,4 +1,4 @@
-namespace OOT_AP_Client.Models;
+namespace OOT_AP_Client.Enums;
 
 public enum LocationType
 {
@@ -16,10 +16,12 @@ public enum LocationType
 	GreatFairy,
 	TrailGreatFairy,
 	CraterGreatFairy,
-	Biggoron,
+	Medigoron,
+	BiggoronSword,
 	BeanSale,
 	FishingChild,
 	FishingAdult,
+	FireArrows,
 	MembershipCardCheck,
 	BombchuSalesman,
 }

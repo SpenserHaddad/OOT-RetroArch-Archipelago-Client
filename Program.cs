@@ -11,7 +11,6 @@ var udpClient = new UdpClient();
 udpClient.Connect(hostname: "localhost", port: 55355);
 
 var retroarchMemoryService = new RetroarchMemoryService(udpClient);
-var locationCheckService = new LocationCheckService(retroarchMemoryService);
 var playerNameService = new PlayerNameService(retroarchMemoryService);
 var currentSceneService = new CurrentSceneService(retroarchMemoryService);
 var receiveItemService = new ReceiveItemService(
@@ -19,6 +18,10 @@ var receiveItemService = new ReceiveItemService(
 	currentSceneService: currentSceneService
 );
 var gameModeService = new GameModeService(retroarchMemoryService);
+var locationCheckService = new LocationCheckService(
+	retroarchMemoryService: retroarchMemoryService,
+	gameModeService: gameModeService
+);
 var deathLinkService = new DeathLinkService(
 	retroarchMemoryService: retroarchMemoryService,
 	gameModeService: gameModeService,
@@ -38,6 +41,7 @@ var loginResult = apSession.TryConnectAndLogin(
 if (!loginResult.Successful)
 {
 	Console.WriteLine("Connection to Archipelago failed, exiting.");
+	return;
 }
 
 Console.WriteLine("Connected to Archipelago");
@@ -49,28 +53,15 @@ var slotSettings = new SlotSettings((long)slotData["shuffle_scrubs"] == 1);
 var collectibleOverridesFlagsAddress = (long)slotData["collectible_override_flags"];
 var collectibleFlagOffsets = SlotDataCollectableFlagOffsetsToArray((JObject)slotData["collectible_flag_offsets"]);
 
-var playerNames = apSession.Players.AllPlayers.Skip(1).Select(x => x.Name);
-var nameIndex = 1; // the names are 1 indexed, nothing is stored at index 0
-foreach (var name in playerNames)
-{
-	if (nameIndex >= 255)
-	{
-		break;
-	}
-
-	var task = playerNameService.WritePlayerName(index: (byte)nameIndex, name: name);
-	task.Wait();
-	nameIndex++;
-}
-
-var applayerNameTask = playerNameService.WritePlayerName(index: 255, name: "APPlayer");
-applayerNameTask.Wait();
-Console.WriteLine("Player names written");
+WritePlayerNames(apSession, playerNameService);
 
 var deathLinkEnabledTask = deathLinkService.SetDeathLinkEnabled();
 deathLinkEnabledTask.Wait();
 var deathLinkEnabled = deathLinkService.DeathLinkEnabled;
 Console.WriteLine($"DeathLink {(deathLinkEnabled ? "is" : "is not")} enabled.");
+
+var masterQuestDungeonHandlingTask = locationCheckService.InitializeMasterQuestHandling();
+masterQuestDungeonHandlingTask.Wait();
 
 var isGameCompletionSent = false;
 
@@ -84,9 +75,26 @@ if (deathLinkEnabled)
 	};
 }
 
+var wasPreviouslyInGame = false;
+
 while (true)
 {
-	Task.Delay(500).Wait();
+	// Task.Delay(500).Wait();
+
+	var currentGameModeTask = gameModeService.GetCurrentGameMode();
+	currentGameModeTask.Wait();
+	if (!currentGameModeTask.Result.IsInGame)
+	{
+		wasPreviouslyInGame = false;
+		continue;
+	}
+
+	if (!wasPreviouslyInGame)
+	{
+		wasPreviouslyInGame = true;
+		WritePlayerNames(apSession, playerNameService);
+	}
+
 	var task = locationCheckService.GetAllCheckedLocationNames(slotSettings);
 	task.Wait();
 	var checkedLocationNames = task.Result;
@@ -103,6 +111,14 @@ while (true)
 
 	var localReceivedItemsCountTask = receiveItemService.GetLocalReceivedItemIndex();
 	localReceivedItemsCountTask.Wait();
+
+	currentGameModeTask = gameModeService.GetCurrentGameMode();
+	currentGameModeTask.Wait();
+	if (!currentGameModeTask.Result.IsInGame)
+	{
+		continue;
+	}
+
 	if (apSession.Items.Index > localReceivedItemsCountTask.Result)
 	{
 		var itemToReceive = apSession.Items.AllItemsReceived[localReceivedItemsCountTask.Result];
@@ -124,6 +140,14 @@ while (true)
 	{
 		var isGameCompleteTask = gameCompleteService.IsGameComplete();
 		isGameCompleteTask.Wait();
+
+		currentGameModeTask = gameModeService.GetCurrentGameMode();
+		currentGameModeTask.Wait();
+		if (!currentGameModeTask.Result.IsInGame)
+		{
+			continue;
+		}
+
 		if (isGameCompleteTask.Result)
 		{
 			apSession.SetGoalAchieved();
@@ -140,8 +164,8 @@ while (true)
 // DONE Setup receiving items
 // DONE Setup deathlink
 // DONE Setup writing player names
-// Setup game completion
-// Setup regular location checking and all locations
+// DONE Setup game completion
+// DONE Setup regular location checking and all locations
 // Setup collectible locations
 
 // Performance improvement idea:
@@ -180,4 +204,25 @@ static List<CollectibleFlagOffset> SlotDataCollectableFlagOffsetsToArray(JObject
 	}
 
 	return convertedCollectibleFlagOffsets;
+}
+
+static void WritePlayerNames(ArchipelagoSession apSession, PlayerNameService playerNameService)
+{
+	var playerNames = apSession.Players.AllPlayers.Skip(1).Select(x => x.Name);
+	var nameIndex = 1; // the names are 1 indexed, nothing is stored at index 0
+	foreach (var name in playerNames)
+	{
+		if (nameIndex >= 255)
+		{
+			break;
+		}
+
+		var task = playerNameService.WritePlayerName(index: (byte)nameIndex, name: name);
+		task.Wait();
+		nameIndex++;
+	}
+
+	var applayerNameTask = playerNameService.WritePlayerName(index: 255, name: "APPlayer");
+	applayerNameTask.Wait();
+	Console.WriteLine("Player names written");
 }
