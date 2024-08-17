@@ -54,7 +54,8 @@ public class LocationCheckService
 	// Might be as simple as a hashmap somewhere that gets loaded with all received items, and stuff only gets sent to the server when it's not in that hashmap
 	public async Task<List<string>> GetAllCheckedLocationNames(SlotSettings slotSettings)
 	{
-		var outgoingItemKey = await _retroarchMemoryService.ReadByteArray(address: 0x8040002c, numberOfBytes: 4);
+		var outgoingItemKey
+			= await _retroarchMemoryService.ReadMemoryToByteArray(address: 0x8040002c, numberOfBytes: 4);
 
 		// Since this is async with the emulator, there's a chance that the key
 		// gets populated after we read it but before we write to clear it

@@ -8,6 +8,20 @@ namespace OOT_AP_Client.Services;
 // Response from Retroarch for writes looks like this: WRITE_CORE_MEMORY <address> <number of bytes written>
 public static class RetroarchCommandStringService
 {
+	public static long ParseAddress(string receivedString)
+	{
+		var address = receivedString.Trim().Split(' ').Skip(1).Take(1).Single();
+
+		return long.Parse(address, style: NumberStyles.HexNumber);
+	}
+
+	public static int ParseNumberOfBytes(string receivedString)
+	{
+		var numberOfBytes = receivedString.Trim().Split(' ').Skip(2).Count();
+
+		return numberOfBytes;
+	}
+
 	public static long ParseReadMemoryToLong(string receivedString, bool isBigEndian)
 	{
 		var bytes = ParseReadMemoryToArray(receivedString: receivedString, isBigEndian: isBigEndian);

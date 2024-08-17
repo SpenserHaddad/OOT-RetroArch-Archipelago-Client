@@ -3,6 +3,12 @@ using System.Text;
 
 namespace OOT_AP_Client.Services;
 
+public record MemoryReadCommand
+{
+	public required long Address { get; init; }
+	public required int NumberOfBytes { get; init; }
+}
+
 public class RetroarchMemoryService
 {
 	private readonly UdpClient _udpClient;
@@ -12,9 +18,22 @@ public class RetroarchMemoryService
 		_udpClient = udpClient;
 	}
 
-	// for now don't read more than 4 bytes at a time, this won't work if you do
-	public async Task<byte[]> ReadByteArray(uint address, int numberOfBytes)
+	/// <summary>
+	///     Reads the requested number of bytes from memory at the target address.
+	///     Because of the swizzled memory, this supports a max of 4 bytes read at a time, or less if the address isn't 4n-1.
+	/// </summary>
+	public async Task<byte[]> ReadMemoryToByteArray(uint address, int numberOfBytes)
 	{
+		if (numberOfBytes > 4)
+		{
+			throw new ArgumentException("This method currently supports a max of 4 bytes read to get proper output.");
+		}
+
+		if (4 - address % 4 < numberOfBytes)
+		{
+			throw new ArgumentException("Requested bytes go beyond a single 4 byte chunk.");
+		}
+
 		var receivedBytes = await SendAndReceiveReadMemory(address: address, numberOfBytes: numberOfBytes);
 
 		var dataFromMemory = RetroarchCommandStringService.ParseReadMemoryToArray(
@@ -25,35 +44,73 @@ public class RetroarchMemoryService
 		return dataFromMemory;
 	}
 
-	public async Task<byte> Read8(uint address)
+	public async Task<byte> Read8(long address)
 	{
 		return (byte)await ReadMemoryToLong(address: address, numberOfBytes: 1);
 	}
 
-	public async Task<short> Read16(uint address)
+	public async Task<short> Read16(long address)
 	{
 		return (short)await ReadMemoryToLong(address: address, numberOfBytes: 2);
 	}
 
-	public async Task<int> Read32(uint address)
+	public async Task<int> Read32(long address)
 	{
 		return (int)await ReadMemoryToLong(address: address, numberOfBytes: 4);
 	}
 
-	// this won't work currently, doesn't use the swizzle properly, don't use it
-	public async Task<long> Read64(uint address)
+	public async Task<Dictionary<long, long>> ReadMemoryToLongMulti(MemoryReadCommand[] readCommands)
 	{
-		return await ReadMemoryToLong(address: address, numberOfBytes: 8);
+		var receivedStrings = await SendAndReceiveReadMemoryMulti(readCommands);
+
+		var responses = new Dictionary<long, long>();
+		foreach (var receivedString in receivedStrings)
+		{
+			var numberOfBytes = RetroarchCommandStringService.ParseNumberOfBytes(receivedString);
+			var address = ConvertAddressFromN64(
+				address: RetroarchCommandStringService.ParseAddress(receivedString),
+				numberOfBytes: numberOfBytes
+			);
+			var data = RetroarchCommandStringService.ParseReadMemoryToLong(
+				receivedString: receivedString,
+				isBigEndian: true
+			);
+			responses.Add(key: address, value: data);
+		}
+
+		return responses;
+	}
+
+	public async Task<Dictionary<long, byte[]>> ReadMemoryToArrayMulti(MemoryReadCommand[] readCommands)
+	{
+		var receivedStrings = await SendAndReceiveReadMemoryMulti(readCommands);
+
+		var responses = new Dictionary<long, byte[]>();
+		foreach (var receivedString in receivedStrings)
+		{
+			var numberOfBytes = RetroarchCommandStringService.ParseNumberOfBytes(receivedString);
+			var address = ConvertAddressFromN64(
+				address: RetroarchCommandStringService.ParseAddress(receivedString),
+				numberOfBytes: numberOfBytes
+			);
+			var data = RetroarchCommandStringService.ParseReadMemoryToArray(
+				receivedString: receivedString,
+				isBigEndian: true
+			);
+			responses.Add(key: address, value: data);
+		}
+
+		return responses;
 	}
 
 	// Input Array should be in little endian (eg 0x01F4 = 500 in base 10)
 	// for now don't write more than 4 bytes at a time, this won't work if you do
-	public async Task<int> WriteByteArray(uint address, byte[] dataToWrite)
+	public async Task<int> WriteByteArray(long address, byte[] dataToWrite)
 	{
 		return await WriteMemory(address: address, dataToWrite: dataToWrite.Reverse().ToArray());
 	}
 
-	public async Task<int> Write8(uint address, byte dataToWrite)
+	public async Task<int> Write8(long address, byte dataToWrite)
 	{
 		return await WriteMemory(
 			address: address,
@@ -61,7 +118,7 @@ public class RetroarchMemoryService
 		);
 	}
 
-	public async Task<int> Write16(uint address, short dataToWrite)
+	public async Task<int> Write16(long address, short dataToWrite)
 	{
 		return await WriteMemory(
 			address: address,
@@ -69,20 +126,11 @@ public class RetroarchMemoryService
 		);
 	}
 
-	public async Task<int> Write32(uint address, int dataToWrite)
+	public async Task<int> Write32(long address, int dataToWrite)
 	{
 		return await WriteMemory(
 			address: address,
 			dataToWrite: NumberToByteArray(number: dataToWrite, numberOfBytes: 4)
-		);
-	}
-
-	// this won't work currently, doesn't use the swizzle properly, don't use it
-	public async Task<int> Write64(uint address, long dataToWrite)
-	{
-		return await WriteMemory(
-			address: address,
-			dataToWrite: NumberToByteArray(number: dataToWrite, numberOfBytes: 8)
 		);
 	}
 
@@ -99,9 +147,15 @@ public class RetroarchMemoryService
 	// and then when the response comes in the callback gets run
 	// That would work for speeding up a lot of small separate calls, although it adds a bunch of complexity
 
-	// Max of 8 bytes at a time (since it's reading into a long)
-	private async Task<long> ReadMemoryToLong(uint address, int numberOfBytes)
+	private async Task<long> ReadMemoryToLong(long address, int numberOfBytes)
 	{
+		if (numberOfBytes > 8)
+		{
+			throw new ArgumentException(
+				"Can't read more than 8 bytes per command with this method as it returns long, use the byte[] version instead"
+			);
+		}
+
 		var receivedString = await SendAndReceiveReadMemory(address: address, numberOfBytes: numberOfBytes);
 
 		var dataFromMemory = RetroarchCommandStringService.ParseReadMemoryToLong(
@@ -112,7 +166,7 @@ public class RetroarchMemoryService
 		return dataFromMemory;
 	}
 
-	private async Task<string> SendAndReceiveReadMemory(uint address, int numberOfBytes)
+	private async Task<string> SendAndReceiveReadMemory(long address, int numberOfBytes)
 	{
 		var convertedAddress = ConvertAddressToN64(address: address, numberOfBytes: numberOfBytes);
 
@@ -123,7 +177,45 @@ public class RetroarchMemoryService
 		return Encoding.UTF8.GetString(receivedBytes);
 	}
 
-	private async Task<int> WriteMemory(uint address, byte[] dataToWrite)
+	private async Task<List<string>> SendAndReceiveReadMemoryMulti(MemoryReadCommand[] readCommands)
+	{
+		var stringBuilder = new StringBuilder();
+
+		foreach (var readCommand in readCommands)
+		{
+			if (readCommand.NumberOfBytes > 4)
+			{
+				throw new ArgumentException(
+					"This method currently supports a max of 4 bytes read to get proper output."
+				);
+			}
+
+			if (4 - readCommand.Address % 4 < readCommand.NumberOfBytes)
+			{
+				throw new ArgumentException("Requested bytes go beyond a single 4 byte chunk.");
+			}
+
+			stringBuilder.Append(
+				$"READ_CORE_MEMORY {ConvertAddressToN64(address: readCommand.Address, numberOfBytes: readCommand.NumberOfBytes):X8} {readCommand.NumberOfBytes}\n"
+			);
+		}
+
+		var responseCounter = 0;
+		var receivedStrings = new List<string>();
+		while (responseCounter < readCommands.Length)
+		{
+			_udpClient.Send(Encoding.UTF8.GetBytes(stringBuilder.ToString()));
+			var receivedBytes = (await _udpClient.ReceiveAsync()).Buffer;
+			var receivedString = Encoding.UTF8.GetString(receivedBytes);
+			receivedStrings.Add(receivedString);
+
+			responseCounter++;
+		}
+
+		return receivedStrings;
+	}
+
+	private async Task<int> WriteMemory(long address, byte[] dataToWrite)
 	{
 		var receivedString = await SendAndReceiveWriteMemory(address: address, dataToWrite: dataToWrite);
 
@@ -132,7 +224,7 @@ public class RetroarchMemoryService
 		return bytesWritten;
 	}
 
-	private async Task<string> SendAndReceiveWriteMemory(uint address, byte[] dataToWrite)
+	private async Task<string> SendAndReceiveWriteMemory(long address, byte[] dataToWrite)
 	{
 		var convertedAddress = ConvertAddressToN64(address: address, numberOfBytes: dataToWrite.Length);
 
@@ -150,20 +242,17 @@ public class RetroarchMemoryService
 		return Encoding.UTF8.GetString(receivedBytes);
 	}
 
-	private static uint ConvertAddressToN64(uint address, int numberOfBytes)
+	private static long ConvertAddressToN64(long address, int numberOfBytes)
 	{
-		// Not sure of why, Bizhawk does this XOR 3 on addresses before using them when the memory is "swizzled"
-		// Also, this is reading big endian memory, which is why the offset is needed
-		// Result of this math is being able to use memory addresses from the lua script directly
+		// The XOR 3 here is done because the memory within each 4 byte chunk is reversed, aka swizzled
+		var translatedAddress = (address ^ 3) - (numberOfBytes - 1);
 
-		// what if it's basically working in 4 byte chunks, the swizzle brings you to the end of the 4 byte chunk
-		// and then the idea is you read/write backwards starting from there
-		// so for things larger than 4 bytes, we would need to do them in separate 4 byte chunks, or handle the swizzle differently
+		return translatedAddress;
+	}
 
-		// yeah, the swizzle basically reverses the address within a 4 byte chunk, so 0 -> 3, 1 -> 2, 2 -> 1, 3 -> 0, 4 -> 7, etc.
-		// need to refactor memory handling at some point to work with this
-
-		var translatedAddress = (uint)((address ^ 3) - (numberOfBytes - 1));
+	private static long ConvertAddressFromN64(long address, int numberOfBytes)
+	{
+		var translatedAddress = (address + (numberOfBytes - 1)) ^ 3;
 
 		return translatedAddress;
 	}
