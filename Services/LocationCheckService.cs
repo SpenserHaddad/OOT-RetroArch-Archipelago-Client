@@ -1,6 +1,7 @@
 using OOT_AP_Client.Data;
 using OOT_AP_Client.Enums;
 using OOT_AP_Client.Models;
+using OOT_AP_Client.Utils;
 
 namespace OOT_AP_Client.Services;
 
@@ -365,7 +366,7 @@ public class LocationCheckService
 		var localSkulltulaOffset = (uint)(skulltulaFlagsOffset + skulltulaArrayIndex);
 		var nearbyMemory = await _retroarchMemoryService.Read8(localSkulltulaOffset);
 
-		return CheckBit(memoryToCheck: nearbyMemory, bitToCheck: locationInformation.BitToCheck);
+		return ByteUtils.CheckBit(memoryToCheck: nearbyMemory, bitToCheck: locationInformation.BitToCheck);
 	}
 
 	private async Task<bool> CheckShopLocation(LocationInformation locationInformation)
@@ -376,7 +377,7 @@ public class LocationCheckService
 
 		var bitToCheck = (byte)(locationInformation.Offset * 4 + locationInformation.BitToCheck);
 
-		return CheckBit(memoryToCheck: nearbyMemory, bitToCheck: bitToCheck);
+		return ByteUtils.CheckBit(memoryToCheck: nearbyMemory, bitToCheck: bitToCheck);
 	}
 
 	// Checked via looking at the points on the card, rather than getting the item itself
@@ -400,7 +401,7 @@ public class LocationCheckService
 
 		var eventRow = await _retroarchMemoryService.Read16(eventAddress);
 
-		return CheckBit(memoryToCheck: eventRow, bitToCheck: locationInformation.BitToCheck);
+		return ByteUtils.CheckBit(memoryToCheck: eventRow, bitToCheck: locationInformation.BitToCheck);
 	}
 
 	private async Task<bool> CheckGetInfoLocation(LocationInformation locationInformation)
@@ -411,7 +412,7 @@ public class LocationCheckService
 
 		var nearbyMemory = await _retroarchMemoryService.Read8(itemGetInfoAddress);
 
-		return CheckBit(memoryToCheck: nearbyMemory, bitToCheck: locationInformation.BitToCheck);
+		return ByteUtils.CheckBit(memoryToCheck: nearbyMemory, bitToCheck: locationInformation.BitToCheck);
 	}
 
 	private async Task<bool> CheckInfoTableLocation(LocationInformation locationInformation)
@@ -422,7 +423,7 @@ public class LocationCheckService
 
 		var nearbyMemory = await _retroarchMemoryService.Read8(itemInfoTableAddress);
 
-		return CheckBit(memoryToCheck: nearbyMemory, bitToCheck: locationInformation.BitToCheck);
+		return ByteUtils.CheckBit(memoryToCheck: nearbyMemory, bitToCheck: locationInformation.BitToCheck);
 	}
 
 	private async Task<bool> CheckMembershipCardLocation()
@@ -432,10 +433,10 @@ public class LocationCheckService
 
 		var eventRow = await _retroarchMemoryService.Read16(eventAddress);
 
-		return CheckBit(memoryToCheck: eventRow, bitToCheck: 0)
-			&& CheckBit(memoryToCheck: eventRow, bitToCheck: 1)
-			&& CheckBit(memoryToCheck: eventRow, bitToCheck: 2)
-			&& CheckBit(memoryToCheck: eventRow, bitToCheck: 3);
+		return ByteUtils.CheckBit(memoryToCheck: eventRow, bitToCheck: 0)
+			&& ByteUtils.CheckBit(memoryToCheck: eventRow, bitToCheck: 1)
+			&& ByteUtils.CheckBit(memoryToCheck: eventRow, bitToCheck: 2)
+			&& ByteUtils.CheckBit(memoryToCheck: eventRow, bitToCheck: 3);
 	}
 
 	private async Task<bool> CheckFishingLocation(bool isAdult)
@@ -446,7 +447,7 @@ public class LocationCheckService
 
 		var nearbyMemory = await _retroarchMemoryService.Read32(fishingContextAddress);
 
-		return CheckBit(memoryToCheck: nearbyMemory, bitToCheck: bitToCheck);
+		return ByteUtils.CheckBit(memoryToCheck: nearbyMemory, bitToCheck: bitToCheck);
 	}
 
 	private async Task<bool> CheckFireArrowsLocation(LocationInformation locationInformation, byte[] outgoingItemKey)
@@ -472,7 +473,7 @@ public class LocationCheckService
 
 		const byte bitToCheck = 8;
 
-		return CheckBit(memoryToCheck: nearbyMemory, bitToCheck: bitToCheck);
+		return ByteUtils.CheckBit(memoryToCheck: nearbyMemory, bitToCheck: bitToCheck);
 	}
 
 	private async Task<bool> SceneCheck(byte sceneOffset, byte bitToCheck, byte sceneDataOffset)
@@ -483,7 +484,7 @@ public class LocationCheckService
 
 		var nearbyMemory = await _retroarchMemoryService.Read32(localSceneOffset);
 
-		return CheckBit(memoryToCheck: nearbyMemory, bitToCheck: bitToCheck);
+		return ByteUtils.CheckBit(memoryToCheck: nearbyMemory, bitToCheck: bitToCheck);
 	}
 
 	private static bool OutgoingKeyCheck(
@@ -495,10 +496,5 @@ public class LocationCheckService
 	{
 		return outgoingItemKey[0] == sceneOffset && outgoingItemKey[1] == ootrLocationType &&
 			outgoingItemKey[3] == bitToCheck;
-	}
-
-	private static bool CheckBit(long memoryToCheck, byte bitToCheck)
-	{
-		return ((uint)(memoryToCheck & (1 << bitToCheck))) >= 1;
 	}
 }

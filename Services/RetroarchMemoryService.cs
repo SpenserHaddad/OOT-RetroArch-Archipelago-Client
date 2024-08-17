@@ -86,6 +86,19 @@ public class RetroarchMemoryService
 		);
 	}
 
+	// Need to massively rethink this service, right now the performance is abysmal
+	// The issue is that the way this works, parallel stuff is impossible
+	// It sends out a command, and then it takes the next value from the socket as the response
+	// It would be better if it stored the command sent out, and then just waited for any response and then we could get ours based on the data sent out
+
+	// Need to think about this more, two interesting places where this is done: 
+	// https://github.com/DigidragonZX/Archipelago/blob/82e3f970e7c9e802a82afac9b908f4868edfb530/worlds/_retroarch/socket.py
+	// https://github.com/WeaponizedEmoticon/gamehook/blob/685645c3a5946a476882c4e0d2bdedf1597e6b58/src/GameHook.Domain/Drivers/RetroArchUdpPollingDriver.cs#L72
+
+	// One idea for a better performing version would be to allow stuff to be completely async, where you send out a command and pass a callback
+	// and then when the response comes in the callback gets run
+	// That would work for speeding up a lot of small separate calls, although it adds a bunch of complexity
+
 	// Max of 8 bytes at a time (since it's reading into a long)
 	private async Task<long> ReadMemoryToLong(uint address, int numberOfBytes)
 	{
@@ -99,7 +112,6 @@ public class RetroarchMemoryService
 		return dataFromMemory;
 	}
 
-	// TODO: might want a timeout waiting for the response here, need to look into why but i think it sometimes gets stuck waiting
 	private async Task<string> SendAndReceiveReadMemory(uint address, int numberOfBytes)
 	{
 		var convertedAddress = ConvertAddressToN64(address: address, numberOfBytes: numberOfBytes);

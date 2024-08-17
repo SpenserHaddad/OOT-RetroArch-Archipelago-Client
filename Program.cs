@@ -22,6 +22,7 @@ var locationCheckService = new LocationCheckService(
 	retroarchMemoryService: retroarchMemoryService,
 	gameModeService: gameModeService
 );
+var collectibleCheckService = new CollectibleCheckService(retroarchMemoryService);
 var deathLinkService = new DeathLinkService(
 	retroarchMemoryService: retroarchMemoryService,
 	gameModeService: gameModeService,
@@ -50,10 +51,14 @@ var archipelagoDeathLinkService = apSession.CreateDeathLinkService();
 
 var slotData = apSession.DataStorage.GetSlotData();
 var slotSettings = new SlotSettings((long)slotData["shuffle_scrubs"] == 1);
-var collectibleOverridesFlagsAddress = (long)slotData["collectible_override_flags"];
+var collectibleOverridesFlagsAddressTask
+	= retroarchMemoryService.Read32(0xA0400000 + Convert.ToUInt32(slotData["collectible_override_flags"]));
+collectibleOverridesFlagsAddressTask.Wait();
+// Reading from the 0x8000000 address range would be valid, it's the same memory as 0xA0000000, just keeping all accesses in 0xA0000000 for consistency
+var collectibleOverridesFlagsAddress = (uint)collectibleOverridesFlagsAddressTask.Result - 0x80000000 + 0xA0000000;
 var collectibleFlagOffsets = SlotDataCollectableFlagOffsetsToArray((JObject)slotData["collectible_flag_offsets"]);
 
-WritePlayerNames(apSession, playerNameService);
+WritePlayerNames(apSession: apSession, playerNameService: playerNameService);
 
 var deathLinkEnabledTask = deathLinkService.SetDeathLinkEnabled();
 deathLinkEnabledTask.Wait();
@@ -79,8 +84,6 @@ var wasPreviouslyInGame = false;
 
 while (true)
 {
-	// Task.Delay(500).Wait();
-
 	var currentGameModeTask = gameModeService.GetCurrentGameMode();
 	currentGameModeTask.Wait();
 	if (!currentGameModeTask.Result.IsInGame)
@@ -92,7 +95,7 @@ while (true)
 	if (!wasPreviouslyInGame)
 	{
 		wasPreviouslyInGame = true;
-		WritePlayerNames(apSession, playerNameService);
+		WritePlayerNames(apSession: apSession, playerNameService: playerNameService);
 	}
 
 	var task = locationCheckService.GetAllCheckedLocationNames(slotSettings);
@@ -105,9 +108,16 @@ while (true)
 				game: "Ocarina of Time",
 				locationName: locationName
 			)
-		)
-		.ToArray();
-	apSession.Locations.CompleteLocationChecks(checkedLocationIds);
+		);
+
+	var checkedCollectibleIdsTask = collectibleCheckService.GetAllCheckedCollectibleIds(
+		collectibleOverridesFlagAddress: collectibleOverridesFlagsAddress,
+		collectibleFlagOffsets: collectibleFlagOffsets
+	);
+	checkedCollectibleIdsTask.Wait();
+	var checkedCollectibleIds = checkedCollectibleIdsTask.Result.Select((id) => (long)id);
+
+	apSession.Locations.CompleteLocationChecks(checkedLocationIds.Concat(checkedCollectibleIds).ToArray());
 
 	var localReceivedItemsCountTask = receiveItemService.GetLocalReceivedItemIndex();
 	localReceivedItemsCountTask.Wait();
@@ -166,7 +176,8 @@ while (true)
 // DONE Setup writing player names
 // DONE Setup game completion
 // DONE Setup regular location checking and all locations
-// Setup collectible locations
+// DONE Setup collectible locations
+// Improve performance
 
 // Performance improvement idea:
 // what if, instead of checking both temp context and save context every time, we only check temp context
@@ -175,6 +186,10 @@ while (true)
 // then, on a less frequent interval, we could check the full save context, maybe every 10 or 30 seconds
 // could also grab save context data in a large chunk (eg all of the data for one area) and then process it
 // save this for after v1
+
+// performance improvement idea:
+// only check save context for locations on area changes, otherwise only use the temp context checks
+// should do this skip inside the function for each check type, so that checks that don't have temp context still get checked for
 
 // idea for sending local items:
 // could have a sort of local database of checked locations, might want that anyway for performance reasons
