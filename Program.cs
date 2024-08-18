@@ -51,22 +51,20 @@ var archipelagoDeathLinkService = apSession.CreateDeathLinkService();
 
 var slotData = apSession.DataStorage.GetSlotData();
 var slotSettings = new SlotSettings((long)slotData["shuffle_scrubs"] == 1);
-var collectibleOverridesFlagsAddressTask
-	= retroarchMemoryService.Read32(0xA0400000 + Convert.ToUInt32(slotData["collectible_override_flags"]));
-collectibleOverridesFlagsAddressTask.Wait();
 // Reading from the 0x8000000 address range would be valid, it's the same memory as 0xA0000000, just keeping all accesses in 0xA0000000 for consistency
-var collectibleOverridesFlagsAddress = (uint)collectibleOverridesFlagsAddressTask.Result - 0x80000000 + 0xA0000000;
+var collectibleOverridesFlagsAddress
+	= (uint)(await retroarchMemoryService.Read32(
+		0xA0400000 + Convert.ToUInt32(slotData["collectible_override_flags"])
+	) - 0x80000000 + 0xA0000000);
 var collectibleFlagOffsets = SlotDataCollectableFlagOffsetsToArray((JObject)slotData["collectible_flag_offsets"]);
 
-WritePlayerNames(apSession: apSession, playerNameService: playerNameService);
+await WritePlayerNames(apSession: apSession, playerNameService: playerNameService);
 
-var deathLinkEnabledTask = deathLinkService.SetDeathLinkEnabled();
-deathLinkEnabledTask.Wait();
+await deathLinkService.StoreDeathLinkEnabledFromMemory();
 var deathLinkEnabled = deathLinkService.DeathLinkEnabled;
 Console.WriteLine($"DeathLink {(deathLinkEnabled ? "is" : "is not")} enabled.");
 
-var masterQuestDungeonHandlingTask = locationCheckService.InitializeMasterQuestHandling();
-masterQuestDungeonHandlingTask.Wait();
+await locationCheckService.InitializeMasterQuestHandling();
 
 var isGameCompletionSent = false;
 
@@ -84,9 +82,8 @@ var wasPreviouslyInGame = false;
 
 while (true)
 {
-	var currentGameModeTask = gameModeService.GetCurrentGameMode();
-	currentGameModeTask.Wait();
-	if (!currentGameModeTask.Result.IsInGame)
+	var currentGameMode = await gameModeService.GetCurrentGameMode();
+	if (!currentGameMode.IsInGame)
 	{
 		wasPreviouslyInGame = false;
 		continue;
@@ -95,12 +92,10 @@ while (true)
 	if (!wasPreviouslyInGame)
 	{
 		wasPreviouslyInGame = true;
-		WritePlayerNames(apSession: apSession, playerNameService: playerNameService);
+		await WritePlayerNames(apSession: apSession, playerNameService: playerNameService);
 	}
 
-	var task = locationCheckService.GetAllCheckedLocationNames(slotSettings);
-	task.Wait();
-	var checkedLocationNames = task.Result;
+	var checkedLocationNames = await locationCheckService.GetAllCheckedLocationNames(slotSettings);
 
 	var checkedLocationIds = checkedLocationNames
 		.Select(
@@ -110,34 +105,28 @@ while (true)
 			)
 		);
 
-	var checkedCollectibleIdsTask = collectibleCheckService.GetAllCheckedCollectibleIds(
+	var checkedCollectibleIds = (await collectibleCheckService.GetAllCheckedCollectibleIds(
 		collectibleOverridesFlagAddress: collectibleOverridesFlagsAddress,
 		collectibleFlagOffsets: collectibleFlagOffsets
-	);
-	checkedCollectibleIdsTask.Wait();
-	var checkedCollectibleIds = checkedCollectibleIdsTask.Result.Select((id) => (long)id);
+	)).Select((id) => id);
 
 	apSession.Locations.CompleteLocationChecks(checkedLocationIds.Concat(checkedCollectibleIds).ToArray());
 
-	var localReceivedItemsCountTask = receiveItemService.GetLocalReceivedItemIndex();
-	localReceivedItemsCountTask.Wait();
+	var localReceivedItemsCount = await receiveItemService.GetLocalReceivedItemIndex();
 
-	currentGameModeTask = gameModeService.GetCurrentGameMode();
-	currentGameModeTask.Wait();
-	if (!currentGameModeTask.Result.IsInGame)
+	currentGameMode = await gameModeService.GetCurrentGameMode();
+	if (!currentGameMode.IsInGame)
 	{
 		continue;
 	}
 
-	if (apSession.Items.Index > localReceivedItemsCountTask.Result)
+	if (apSession.Items.Index > localReceivedItemsCount)
 	{
-		var itemToReceive = apSession.Items.AllItemsReceived[localReceivedItemsCountTask.Result];
-		var receiveItemTask = receiveItemService.ReceiveItem(itemToReceive);
-		receiveItemTask.Wait();
+		var itemToReceive = apSession.Items.AllItemsReceived[localReceivedItemsCount];
+		await receiveItemService.ReceiveItem(itemToReceive);
 	}
 
-	var processDeathLinkTask = deathLinkService.ProcessDeathLink();
-	processDeathLinkTask.Wait();
+	await deathLinkService.ProcessDeathLink();
 
 	if (deathLinkService.ShouldSendDeathLink())
 	{
@@ -148,17 +137,15 @@ while (true)
 
 	if (!isGameCompletionSent)
 	{
-		var isGameCompleteTask = gameCompleteService.IsGameComplete();
-		isGameCompleteTask.Wait();
+		var isGameComplete = await gameCompleteService.IsGameComplete();
 
-		currentGameModeTask = gameModeService.GetCurrentGameMode();
-		currentGameModeTask.Wait();
-		if (!currentGameModeTask.Result.IsInGame)
+		currentGameMode = await gameModeService.GetCurrentGameMode();
+		if (!currentGameMode.IsInGame)
 		{
 			continue;
 		}
 
-		if (isGameCompleteTask.Result)
+		if (isGameComplete)
 		{
 			apSession.SetGoalAchieved();
 			isGameCompletionSent = true;
@@ -221,7 +208,7 @@ static List<CollectibleFlagOffset> SlotDataCollectableFlagOffsetsToArray(JObject
 	return convertedCollectibleFlagOffsets;
 }
 
-static void WritePlayerNames(ArchipelagoSession apSession, PlayerNameService playerNameService)
+static async Task WritePlayerNames(ArchipelagoSession apSession, PlayerNameService playerNameService)
 {
 	var playerNames = apSession.Players.AllPlayers.Skip(1).Select(x => x.Name);
 	var nameIndex = 1; // the names are 1 indexed, nothing is stored at index 0
@@ -232,12 +219,10 @@ static void WritePlayerNames(ArchipelagoSession apSession, PlayerNameService pla
 			break;
 		}
 
-		var task = playerNameService.WritePlayerName(index: (byte)nameIndex, name: name);
-		task.Wait();
+		await playerNameService.WritePlayerName(index: (byte)nameIndex, name: name);
 		nameIndex++;
 	}
 
-	var applayerNameTask = playerNameService.WritePlayerName(index: 255, name: "APPlayer");
-	applayerNameTask.Wait();
+	await playerNameService.WritePlayerName(index: 255, name: "APPlayer");
 	Console.WriteLine("Player names written");
 }

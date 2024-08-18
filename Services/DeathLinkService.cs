@@ -23,7 +23,7 @@ public class DeathLinkService
 		_currentSceneService = currentSceneService;
 	}
 
-	public async Task SetDeathLinkEnabled()
+	public async Task StoreDeathLinkEnabledFromMemory()
 	{
 		const uint deathLinkEnabledFlagAddress = 0xA040002B;
 

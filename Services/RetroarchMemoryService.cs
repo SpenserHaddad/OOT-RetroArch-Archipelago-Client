@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Net.Sockets;
 using System.Text;
 
@@ -59,7 +60,7 @@ public class RetroarchMemoryService
 		return (int)await ReadMemoryToLong(address: address, numberOfBytes: 4);
 	}
 
-	public async Task<Dictionary<long, long>> ReadMemoryToLongMulti(MemoryReadCommand[] readCommands)
+	public async Task<Dictionary<long, long>> ReadMemoryToLongMulti(IEnumerable<MemoryReadCommand> readCommands)
 	{
 		var receivedStrings = await SendAndReceiveReadMemoryMulti(readCommands);
 
@@ -81,7 +82,7 @@ public class RetroarchMemoryService
 		return responses;
 	}
 
-	public async Task<Dictionary<long, byte[]>> ReadMemoryToArrayMulti(MemoryReadCommand[] readCommands)
+	public async Task<Dictionary<long, byte[]>> ReadMemoryToArrayMulti(IEnumerable<MemoryReadCommand> readCommands)
 	{
 		var receivedStrings = await SendAndReceiveReadMemoryMulti(readCommands);
 
@@ -103,7 +104,7 @@ public class RetroarchMemoryService
 		return responses;
 	}
 
-	// Input Array should be in little endian (eg 0x01F4 = 500 in base 10)
+	// Input Array should be in little endian (e.g. 0x01F4 = 500 in base 10)
 	// for now don't write more than 4 bytes at a time, this won't work if you do
 	public async Task<int> WriteByteArray(long address, byte[] dataToWrite)
 	{
@@ -137,7 +138,7 @@ public class RetroarchMemoryService
 	// Need to massively rethink this service, right now the performance is abysmal
 	// The issue is that the way this works, parallel stuff is impossible
 	// It sends out a command, and then it takes the next value from the socket as the response
-	// It would be better if it stored the command sent out, and then just waited for any response and then we could get ours based on the data sent out
+	// It would be better if it stored the command sent out, and then just waited for any response, and then we could get ours based on the data sent out
 
 	// Need to think about this more, two interesting places where this is done: 
 	// https://github.com/DigidragonZX/Archipelago/blob/82e3f970e7c9e802a82afac9b908f4868edfb530/worlds/_retroarch/socket.py
@@ -177,39 +178,52 @@ public class RetroarchMemoryService
 		return Encoding.UTF8.GetString(receivedBytes);
 	}
 
-	private async Task<List<string>> SendAndReceiveReadMemoryMulti(MemoryReadCommand[] readCommands)
+	private async Task<List<string>> SendAndReceiveReadMemoryMulti(IEnumerable<MemoryReadCommand> readCommands)
 	{
+		const int commandsPerIteration = 50;
+
+		var inMemoryReadCommands = readCommands.ToImmutableArray();
+
 		var stringBuilder = new StringBuilder();
 
-		foreach (var readCommand in readCommands)
+		var receivedStrings = new List<string>();
+
+		var commandsExecuted = 0;
+		while (commandsExecuted < inMemoryReadCommands.Length)
 		{
-			if (readCommand.NumberOfBytes > 4)
+			foreach (var readCommand in inMemoryReadCommands.Skip(commandsExecuted).Take(commandsPerIteration))
 			{
-				throw new ArgumentException(
-					"This method currently supports a max of 4 bytes read to get proper output."
+				if (readCommand.NumberOfBytes > 4)
+				{
+					throw new ArgumentException(
+						"This method currently supports a max of 4 bytes read to get proper output."
+					);
+				}
+
+				if (4 - readCommand.Address % 4 < readCommand.NumberOfBytes)
+				{
+					throw new ArgumentException("Requested bytes go beyond a single 4 byte chunk.");
+				}
+
+				stringBuilder.Append(
+					$"READ_CORE_MEMORY {ConvertAddressToN64(address: readCommand.Address, numberOfBytes: readCommand.NumberOfBytes):X8} {readCommand.NumberOfBytes}\n"
 				);
 			}
 
-			if (4 - readCommand.Address % 4 < readCommand.NumberOfBytes)
+			_udpClient.Send(Encoding.UTF8.GetBytes(stringBuilder.ToString()));
+			stringBuilder.Clear();
+
+			var responseCounter = 0;
+			while (responseCounter < Math.Min(commandsPerIteration, inMemoryReadCommands.Length - commandsExecuted))
 			{
-				throw new ArgumentException("Requested bytes go beyond a single 4 byte chunk.");
+				var receivedBytes = (await _udpClient.ReceiveAsync()).Buffer;
+				var receivedString = Encoding.UTF8.GetString(receivedBytes);
+				receivedStrings.Add(receivedString);
+
+				responseCounter++;
 			}
 
-			stringBuilder.Append(
-				$"READ_CORE_MEMORY {ConvertAddressToN64(address: readCommand.Address, numberOfBytes: readCommand.NumberOfBytes):X8} {readCommand.NumberOfBytes}\n"
-			);
-		}
-
-		var responseCounter = 0;
-		var receivedStrings = new List<string>();
-		while (responseCounter < readCommands.Length)
-		{
-			_udpClient.Send(Encoding.UTF8.GetBytes(stringBuilder.ToString()));
-			var receivedBytes = (await _udpClient.ReceiveAsync()).Buffer;
-			var receivedString = Encoding.UTF8.GetString(receivedBytes);
-			receivedStrings.Add(receivedString);
-
-			responseCounter++;
+			commandsExecuted += commandsPerIteration;
 		}
 
 		return receivedStrings;
