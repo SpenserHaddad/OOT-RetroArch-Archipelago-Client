@@ -65,6 +65,7 @@ var deathLinkEnabled = deathLinkService.DeathLinkEnabled;
 Console.WriteLine($"DeathLink {(deathLinkEnabled ? "is" : "is not")} enabled.");
 
 await locationCheckService.InitializeMasterQuestHandling();
+await locationCheckService.InitializeBigPoesRequired();
 
 var isGameCompletionSent = false;
 
