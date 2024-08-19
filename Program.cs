@@ -7,6 +7,20 @@ using OOT_AP_Client.Models;
 using OOT_AP_Client.Services;
 using DeathLinkService = OOT_AP_Client.Services.DeathLinkService;
 
+Console.WriteLine("Enter the AP hostname, default: archipelago.gg");
+var apHostname = Console.ReadLine();
+if (string.IsNullOrWhiteSpace(apHostname))
+{
+	apHostname = "archipelago.gg";
+}
+
+Console.WriteLine("Enter the AP port, default: 38281");
+var apPortString = Console.ReadLine();
+var apPort = string.IsNullOrWhiteSpace(apPortString) ? 38281 : int.Parse(apPortString);
+
+Console.WriteLine("Enter the Slot Name");
+var slotName = Console.ReadLine();
+
 var udpClient = new UdpClient();
 udpClient.Connect(hostname: "localhost", port: 55355);
 
@@ -30,12 +44,10 @@ var deathLinkService = new DeathLinkService(
 );
 var gameCompleteService = new GameCompleteService(retroarchMemoryService);
 
-var apSession = ArchipelagoSessionFactory.CreateSession("localhost");
-var playerName = "Player1";
-// var playerName = "Player2";
+var apSession = ArchipelagoSessionFactory.CreateSession(hostname: apHostname, port: apPort);
 var loginResult = apSession.TryConnectAndLogin(
 	game: "Ocarina of Time",
-	name: playerName,
+	name: slotName,
 	itemsHandlingFlags: ItemsHandlingFlags.RemoteItems
 );
 
@@ -131,7 +143,7 @@ while (true)
 
 	if (deathLinkService.ShouldSendDeathLink())
 	{
-		var deathLink = new DeathLink(playerName);
+		var deathLink = new DeathLink(slotName);
 		archipelagoDeathLinkService.SendDeathLink(deathLink);
 		Console.WriteLine("Death link sent.");
 	}
@@ -165,7 +177,7 @@ while (true)
 // DONE Setup game completion
 // DONE Setup regular location checking and all locations
 // DONE Setup collectible locations
-// Improve performance
+// DONE Improve performance
 
 // Performance improvement idea:
 // what if, instead of checking both temp context and save context every time, we only check temp context
