@@ -68,7 +68,7 @@ var collectibleOverridesFlagsAddress
 	= (uint)(await retroarchMemoryService.Read32(
 		0xA0400000 + Convert.ToUInt32(slotData["collectible_override_flags"])
 	) - 0x80000000 + 0xA0000000);
-var collectibleFlagOffsets = SlotDataCollectableFlagOffsetsToArray((JObject)slotData["collectible_flag_offsets"]);
+var collectibleFlagOffsets = SlotDataCollectableFlagOffsetsToArray(slotData["collectible_flag_offsets"] as JObject);
 
 await WritePlayerNames(apSession: apSession, playerNameService: playerNameService);
 
@@ -167,31 +167,12 @@ while (true)
 	}
 }
 
-// Overall TODO:
-// DONE Setup methods for reading and writing various sizes of data, as well as reading and writing byte[]s, this should abstract away the pointer swizzle and such
-// DONE (partially, only chests are setup) Setup code for checking the state of a location
-// DONE Setup general code that runs every half second, omit receiving items and deathlinks as a start, just have sending out locations
-// DONE Setup receiving items
-// DONE Setup deathlink
-// DONE Setup writing player names
-// DONE Setup game completion
-// DONE Setup regular location checking and all locations
-// DONE Setup collectible locations
-// DONE Improve performance
-
-// Performance improvement idea:
-// what if, instead of checking both temp context and save context every time, we only check temp context
-// the temp context check could be a lot quicker, we could look at the scene first and then look at the id, so we could use a nested dictionary or something
-// could construct that data structure on startup and store into a static variable, or process it in advance and serialize it, but it's probably not going to take long
-// then, on a less frequent interval, we could check the full save context, maybe every 10 or 30 seconds
-// could also grab save context data in a large chunk (eg all of the data for one area) and then process it
-// save this for after v1
-
 // performance improvement idea:
 // only check save context for locations on area changes, otherwise only use the temp context checks
 // should do this skip inside the function for each check type, so that checks that don't have temp context still get checked for
+// with how fast it is now, this would only be worth it for battery usage reasons
 
-// idea for sending local items:
+// idea for receiving local items:
 // could have a sort of local database of checked locations, might want that anyway for performance reasons
 // any location in the local save file that is checked would be in there, but if you make a new save then there could be locations checked in the multiworld that aren't marked as checked in the local database
 // the idea would be that when processing the item queue, we can check against the local database, if the location is marked as checked there then that means we don't give the item, if it's not marked as checked then we do give the item
@@ -203,7 +184,13 @@ static List<CollectibleFlagOffset> SlotDataCollectableFlagOffsetsToArray(JObject
 
 	foreach (var flagOffsetData in slotDataCollectibleFlagOffsets)
 	{
-		var itemId = uint.Parse(flagOffsetData.Key);
+		// The slot data seems to always have a null key in it unless all collectible checks are enabled
+		if (flagOffsetData.Key == "null")
+		{
+			continue;
+		}
+
+		var itemId = long.Parse(flagOffsetData.Key);
 
 		var jArray = flagOffsetData.Value as JArray;
 		if (jArray is null)
@@ -212,10 +199,17 @@ static List<CollectibleFlagOffset> SlotDataCollectableFlagOffsetsToArray(JObject
 			continue;
 		}
 
-		var offset = jArray[0].Value<uint>();
-		var flag = jArray[1].Value<uint>();
+		var offset = jArray[0].Value<long>();
+		var flag = jArray[1].Value<long>();
 
-		convertedCollectibleFlagOffsets.Add(new CollectibleFlagOffset(itemId: itemId, offset: offset, flag: flag));
+		convertedCollectibleFlagOffsets.Add(
+			new CollectibleFlagOffset
+			{
+				ItemId = itemId,
+				Offset = offset,
+				Flag = flag,
+			}
+		);
 	}
 
 	return convertedCollectibleFlagOffsets;
