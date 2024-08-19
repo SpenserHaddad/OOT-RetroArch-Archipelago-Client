@@ -3,9 +3,10 @@ using Archipelago.MultiClient.Net;
 using Archipelago.MultiClient.Net.BounceFeatures.DeathLink;
 using Archipelago.MultiClient.Net.Enums;
 using Newtonsoft.Json.Linq;
-using OOT_AP_Client.Models;
+using OOT_AP_Client.OcarinaOfTime.Models;
+using OOT_AP_Client.OcarinaOfTime.Services;
 using OOT_AP_Client.Services;
-using DeathLinkService = OOT_AP_Client.Services.DeathLinkService;
+using DeathLinkService = OOT_AP_Client.OcarinaOfTime.Services.DeathLinkService;
 
 Console.WriteLine("Enter the AP hostname, default: archipelago.gg");
 var apHostname = Console.ReadLine();
@@ -28,17 +29,17 @@ var retroarchMemoryService = new RetroarchMemoryService(udpClient);
 var playerNameService = new PlayerNameService(retroarchMemoryService);
 var currentSceneService = new CurrentSceneService(retroarchMemoryService);
 var receiveItemService = new ReceiveItemService(
-	retroarchMemoryService: retroarchMemoryService,
+	memoryService: retroarchMemoryService,
 	currentSceneService: currentSceneService
 );
 var gameModeService = new GameModeService(retroarchMemoryService);
 var locationCheckService = new LocationCheckService(
-	retroarchMemoryService: retroarchMemoryService,
+	memoryService: retroarchMemoryService,
 	gameModeService: gameModeService
 );
 var collectibleCheckService = new CollectibleCheckService(retroarchMemoryService);
 var deathLinkService = new DeathLinkService(
-	retroarchMemoryService: retroarchMemoryService,
+	memoryService: retroarchMemoryService,
 	gameModeService: gameModeService,
 	currentSceneService: currentSceneService
 );
@@ -65,9 +66,9 @@ var slotData = apSession.DataStorage.GetSlotData();
 var slotSettings = new SlotSettings((long)slotData["shuffle_scrubs"] == 1);
 // Reading from the 0x8000000 address range would be valid, it's the same memory as 0xA0000000, just keeping all accesses in 0xA0000000 for consistency
 var collectibleOverridesFlagsAddress
-	= (uint)(await retroarchMemoryService.Read32(
+	= await retroarchMemoryService.Read32(
 		0xA0400000 + Convert.ToUInt32(slotData["collectible_override_flags"])
-	) - 0x80000000 + 0xA0000000);
+	) - 0x80000000 + 0xA0000000;
 var collectibleFlagOffsets = SlotDataCollectableFlagOffsetsToArray(slotData["collectible_flag_offsets"] as JObject);
 
 await WritePlayerNames(apSession: apSession, playerNameService: playerNameService);

@@ -1,6 +1,6 @@
-using OOT_AP_Client.Enums;
+using OOT_AP_Client.OcarinaOfTime.Enums;
 
-namespace OOT_AP_Client.Models;
+namespace OOT_AP_Client.OcarinaOfTime.Models;
 
 public class LocationInformation
 {

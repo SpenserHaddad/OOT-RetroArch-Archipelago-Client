@@ -1,8 +1,10 @@
-namespace OOT_AP_Client.Services;
+using OOT_AP_Client.Services.Interfaces;
+
+namespace OOT_AP_Client.OcarinaOfTime.Services;
 
 public class DeathLinkService
 {
-	private readonly RetroarchMemoryService _retroarchMemoryService;
+	private readonly IMemoryService _memoryService;
 	private readonly CurrentSceneService _currentSceneService;
 	private readonly GameModeService _gameModeService;
 
@@ -13,12 +15,12 @@ public class DeathLinkService
 	private bool _deathLinkSent = false;
 
 	public DeathLinkService(
-		RetroarchMemoryService retroarchMemoryService,
+		IMemoryService memoryService,
 		GameModeService gameModeService,
 		CurrentSceneService currentSceneService
 	)
 	{
-		_retroarchMemoryService = retroarchMemoryService;
+		_memoryService = memoryService;
 		_gameModeService = gameModeService;
 		_currentSceneService = currentSceneService;
 	}
@@ -27,7 +29,7 @@ public class DeathLinkService
 	{
 		const uint deathLinkEnabledFlagAddress = 0xA040002B;
 
-		var deathLinkEnabledFlag = await _retroarchMemoryService.Read8(deathLinkEnabledFlagAddress);
+		var deathLinkEnabledFlag = await _memoryService.Read8(deathLinkEnabledFlagAddress);
 
 		DeathLinkEnabled = deathLinkEnabledFlag > 0;
 	}
@@ -63,7 +65,7 @@ public class DeathLinkService
 			}
 
 			const uint linkHealthAddress = 0xA011A600;
-			await _retroarchMemoryService.Write16(address: linkHealthAddress, dataToWrite: 0);
+			await _memoryService.Write16(address: linkHealthAddress, dataToWrite: 0);
 		}
 	}
 

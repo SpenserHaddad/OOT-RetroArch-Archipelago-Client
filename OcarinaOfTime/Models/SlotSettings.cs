@@ -1,4 +1,4 @@
-namespace OOT_AP_Client.Models;
+namespace OOT_AP_Client.OcarinaOfTime.Models;
 
 public record SlotSettings
 {

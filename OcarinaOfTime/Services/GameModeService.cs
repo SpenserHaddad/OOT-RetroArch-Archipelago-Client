@@ -1,12 +1,15 @@
-namespace OOT_AP_Client.Services;
+using OOT_AP_Client.OcarinaOfTime.Models;
+using OOT_AP_Client.Services.Interfaces;
+
+namespace OOT_AP_Client.OcarinaOfTime.Services;
 
 public class GameModeService
 {
-	private readonly RetroarchMemoryService _retroarchMemoryService;
+	private readonly IMemoryService _memoryService;
 
-	public GameModeService(RetroarchMemoryService retroarchMemoryService)
+	public GameModeService(IMemoryService memoryService)
 	{
-		_retroarchMemoryService = retroarchMemoryService;
+		_memoryService = memoryService;
 	}
 
 	public async Task<GameMode> GetCurrentGameMode()
@@ -58,28 +61,28 @@ public class GameModeService
 	{
 		const uint mainStateOffset = 0xA011B92F;
 
-		return await _retroarchMemoryService.Read8(mainStateOffset);
+		return await _memoryService.Read8(mainStateOffset);
 	}
 
 	private async Task<byte> GetSubState()
 	{
 		const uint subStateOffset = 0xA011B933;
 
-		return await _retroarchMemoryService.Read8(subStateOffset);
+		return await _memoryService.Read8(subStateOffset);
 	}
 
 	private async Task<byte> GetMenuState()
 	{
 		const uint menuStateOffset = 0xA01D8DD5;
 
-		return await _retroarchMemoryService.Read8(menuStateOffset);
+		return await _memoryService.Read8(menuStateOffset);
 	}
 
 	private async Task<uint> GetLogoState()
 	{
 		const uint logoStateOffset = 0xA011F200;
 
-		return (uint)await _retroarchMemoryService.Read32(logoStateOffset);
+		return (uint)await _memoryService.Read32(logoStateOffset);
 	}
 
 	private async Task<bool> GetLinkIsDying()
@@ -87,8 +90,8 @@ public class GameModeService
 		const uint linkStateOffset = 0xA01DB09C;
 		const uint linkHealthOffset = 0xA011A600;
 
-		var linkState = await _retroarchMemoryService.Read32(linkStateOffset);
-		var linkHealth = await _retroarchMemoryService.Read16(linkHealthOffset);
+		var linkState = await _memoryService.Read32(linkStateOffset);
+		var linkHealth = await _memoryService.Read16(linkHealthOffset);
 
 		return (linkState & 0x00000080) > 0 && linkHealth == 0;
 	}
@@ -106,16 +109,4 @@ public class GameModeService
 		new(name: "Dying Menu Start", isInGame: false),
 		new(name: "Dead", isInGame: false),
 	}.ToDictionary((gameMode) => gameMode.Name);
-}
-
-public record GameMode
-{
-	public GameMode(string name, bool isInGame)
-	{
-		Name = name;
-		IsInGame = isInGame;
-	}
-
-	public string Name { get; }
-	public bool IsInGame { get; }
 }

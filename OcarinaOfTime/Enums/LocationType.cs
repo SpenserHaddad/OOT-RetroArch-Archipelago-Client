@@ -1,4 +1,4 @@
-namespace OOT_AP_Client.Enums;
+namespace OOT_AP_Client.OcarinaOfTime.Enums;
 
 public enum LocationType
 {

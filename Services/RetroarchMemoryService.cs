@@ -1,16 +1,13 @@
 using System.Collections.Immutable;
 using System.Net.Sockets;
 using System.Text;
+using OOT_AP_Client.Models;
+using OOT_AP_Client.Services.Interfaces;
+using OOT_AP_Client.Utils;
 
 namespace OOT_AP_Client.Services;
 
-public record MemoryReadCommand
-{
-	public required long Address { get; init; }
-	public required int NumberOfBytes { get; init; }
-}
-
-public class RetroarchMemoryService
+public class RetroarchMemoryService : IMemoryService
 {
 	private readonly UdpClient _udpClient;
 
@@ -23,7 +20,7 @@ public class RetroarchMemoryService
 	///     Reads the requested number of bytes from memory at the target address.
 	///     Because of the swizzled memory, this supports a max of 4 bytes read at a time, or less if the address isn't 4n-1.
 	/// </summary>
-	public async Task<byte[]> ReadMemoryToByteArray(uint address, int numberOfBytes)
+	public async Task<byte[]> ReadMemoryToByteArray(long address, int numberOfBytes)
 	{
 		if (numberOfBytes > 4)
 		{
@@ -37,7 +34,7 @@ public class RetroarchMemoryService
 
 		var receivedBytes = await SendAndReceiveReadMemory(address: address, numberOfBytes: numberOfBytes);
 
-		var dataFromMemory = RetroarchCommandStringService.ParseReadMemoryToArray(
+		var dataFromMemory = RetroarchCommandStringUtils.ParseReadMemoryToArray(
 			receivedString: receivedBytes,
 			isBigEndian: true
 		);
@@ -50,14 +47,14 @@ public class RetroarchMemoryService
 		return (byte)await ReadMemoryToLong(address: address, numberOfBytes: 1);
 	}
 
-	public async Task<short> Read16(long address)
+	public async Task<ushort> Read16(long address)
 	{
-		return (short)await ReadMemoryToLong(address: address, numberOfBytes: 2);
+		return (ushort)await ReadMemoryToLong(address: address, numberOfBytes: 2);
 	}
 
-	public async Task<int> Read32(long address)
+	public async Task<uint> Read32(long address)
 	{
-		return (int)await ReadMemoryToLong(address: address, numberOfBytes: 4);
+		return (uint)await ReadMemoryToLong(address: address, numberOfBytes: 4);
 	}
 
 	public async Task<Dictionary<long, long>> ReadMemoryToLongMulti(IEnumerable<MemoryReadCommand> readCommands)
@@ -67,12 +64,12 @@ public class RetroarchMemoryService
 		var responses = new Dictionary<long, long>();
 		foreach (var receivedString in receivedStrings)
 		{
-			var numberOfBytes = RetroarchCommandStringService.ParseNumberOfBytes(receivedString);
+			var numberOfBytes = RetroarchCommandStringUtils.ParseNumberOfBytes(receivedString);
 			var address = ConvertAddressFromN64(
-				address: RetroarchCommandStringService.ParseAddress(receivedString),
+				address: RetroarchCommandStringUtils.ParseAddress(receivedString),
 				numberOfBytes: numberOfBytes
 			);
-			var data = RetroarchCommandStringService.ParseReadMemoryToLong(
+			var data = RetroarchCommandStringUtils.ParseReadMemoryToLong(
 				receivedString: receivedString,
 				isBigEndian: true
 			);
@@ -89,12 +86,12 @@ public class RetroarchMemoryService
 		var responses = new Dictionary<long, byte[]>();
 		foreach (var receivedString in receivedStrings)
 		{
-			var numberOfBytes = RetroarchCommandStringService.ParseNumberOfBytes(receivedString);
+			var numberOfBytes = RetroarchCommandStringUtils.ParseNumberOfBytes(receivedString);
 			var address = ConvertAddressFromN64(
-				address: RetroarchCommandStringService.ParseAddress(receivedString),
+				address: RetroarchCommandStringUtils.ParseAddress(receivedString),
 				numberOfBytes: numberOfBytes
 			);
-			var data = RetroarchCommandStringService.ParseReadMemoryToArray(
+			var data = RetroarchCommandStringUtils.ParseReadMemoryToArray(
 				receivedString: receivedString,
 				isBigEndian: true
 			);
@@ -104,32 +101,31 @@ public class RetroarchMemoryService
 		return responses;
 	}
 
-	// Input Array should be in little endian (e.g. 0x01F4 = 500 in base 10)
 	// for now don't write more than 4 bytes at a time, this won't work if you do
 	public async Task<int> WriteByteArray(long address, byte[] dataToWrite)
 	{
 		return await WriteMemory(address: address, dataToWrite: dataToWrite.Reverse().ToArray());
 	}
 
-	public async Task<int> Write8(long address, byte dataToWrite)
+	public async Task Write8(long address, byte dataToWrite)
 	{
-		return await WriteMemory(
+		await WriteMemory(
 			address: address,
 			dataToWrite: NumberToByteArray(number: dataToWrite, numberOfBytes: 1)
 		);
 	}
 
-	public async Task<int> Write16(long address, short dataToWrite)
+	public async Task Write16(long address, ushort dataToWrite)
 	{
-		return await WriteMemory(
+		await WriteMemory(
 			address: address,
 			dataToWrite: NumberToByteArray(number: dataToWrite, numberOfBytes: 2)
 		);
 	}
 
-	public async Task<int> Write32(long address, int dataToWrite)
+	public async Task Write32(long address, uint dataToWrite)
 	{
-		return await WriteMemory(
+		await WriteMemory(
 			address: address,
 			dataToWrite: NumberToByteArray(number: dataToWrite, numberOfBytes: 4)
 		);
@@ -159,7 +155,7 @@ public class RetroarchMemoryService
 
 		var receivedString = await SendAndReceiveReadMemory(address: address, numberOfBytes: numberOfBytes);
 
-		var dataFromMemory = RetroarchCommandStringService.ParseReadMemoryToLong(
+		var dataFromMemory = RetroarchCommandStringUtils.ParseReadMemoryToLong(
 			receivedString: receivedString,
 			isBigEndian: true
 		);
@@ -214,7 +210,10 @@ public class RetroarchMemoryService
 			stringBuilder.Clear();
 
 			var responseCounter = 0;
-			while (responseCounter < Math.Min(commandsPerIteration, inMemoryReadCommands.Length - commandsExecuted))
+			while (responseCounter < Math.Min(
+					val1: commandsPerIteration,
+					val2: inMemoryReadCommands.Length - commandsExecuted
+				))
 			{
 				var receivedBytes = (await _udpClient.ReceiveAsync()).Buffer;
 				var receivedString = Encoding.UTF8.GetString(receivedBytes);
@@ -233,7 +232,7 @@ public class RetroarchMemoryService
 	{
 		var receivedString = await SendAndReceiveWriteMemory(address: address, dataToWrite: dataToWrite);
 
-		var bytesWritten = RetroarchCommandStringService.ParseWriteMemoryBytesWritten(receivedString);
+		var bytesWritten = RetroarchCommandStringUtils.ParseWriteMemoryBytesWritten(receivedString);
 
 		return bytesWritten;
 	}

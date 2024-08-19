@@ -1,30 +1,32 @@
 using System.Collections.Immutable;
-using OOT_AP_Client.Data;
-using OOT_AP_Client.Enums;
 using OOT_AP_Client.Models;
+using OOT_AP_Client.OcarinaOfTime.Data;
+using OOT_AP_Client.OcarinaOfTime.Enums;
+using OOT_AP_Client.OcarinaOfTime.Models;
+using OOT_AP_Client.Services.Interfaces;
 using OOT_AP_Client.Utils;
 
-namespace OOT_AP_Client.Services;
+namespace OOT_AP_Client.OcarinaOfTime.Services;
 
 public class LocationCheckService
 {
 	private readonly GameModeService _gameModeService;
-	private readonly RetroarchMemoryService _retroarchMemoryService;
+	private readonly IMemoryService _memoryService;
 
 	private readonly HashSet<Area> AreasToSkipChecking = [];
 
 	private int bigPoePointsRequired = int.MaxValue;
 
-	public LocationCheckService(RetroarchMemoryService retroarchMemoryService, GameModeService gameModeService)
+	public LocationCheckService(IMemoryService memoryService, GameModeService gameModeService)
 	{
-		_retroarchMemoryService = retroarchMemoryService;
+		_memoryService = memoryService;
 		_gameModeService = gameModeService;
 	}
 
 	public async Task InitializeMasterQuestHandling()
 	{
 		var masterQuestTableAddress
-			= 0xA0400000 + (await _retroarchMemoryService.Read32(0xA0400E9F) - 0x03480000);
+			= 0xA0400000 + (await _memoryService.Read32(0xA0400E9F) - 0x03480000);
 
 		var dungeonToDungeonId = new Dictionary<Area, byte>
 		{
@@ -46,7 +48,7 @@ public class LocationCheckService
 		{
 			// Currently this takes advantage of the fact that the MQ versions of each dungeon are right after the regular one in the enum
 			// Don't really like this though, should change it at some point
-			var isMasterQuest = await _retroarchMemoryService.Read8(masterQuestTableAddress + dungeonId) == 1;
+			var isMasterQuest = await _memoryService.Read8(masterQuestTableAddress + dungeonId) == 1;
 			var areaToSkip = isMasterQuest ? area : area + 1;
 
 			AreasToSkipChecking.Add(areaToSkip);
@@ -56,7 +58,7 @@ public class LocationCheckService
 	public async Task InitializeBigPoesRequired()
 	{
 		const long bigPoesRequiredAddress = 0xA0400EAD;
-		var bigPoesRequired = await _retroarchMemoryService.Read8(bigPoesRequiredAddress);
+		var bigPoesRequired = await _memoryService.Read8(bigPoesRequiredAddress);
 		bigPoePointsRequired = bigPoesRequired * 10;
 	}
 
@@ -65,18 +67,18 @@ public class LocationCheckService
 	public async Task<List<string>> GetAllCheckedLocationNames(SlotSettings slotSettings)
 	{
 		var outgoingItemKey
-			= await _retroarchMemoryService.ReadMemoryToByteArray(address: 0x8040002c, numberOfBytes: 4);
+			= await _memoryService.ReadMemoryToByteArray(address: 0x8040002c, numberOfBytes: 4);
 
 		// Since this is async with the emulator, there's a chance that the key
 		// gets populated after we read it but before we write to clear it
 		// So we make sure we actually read some data before clearing it
 		if (outgoingItemKey.Any((b) => b != 0x00))
 		{
-			await _retroarchMemoryService.WriteByteArray(
+			await _memoryService.WriteByteArray(
 				address: 0x8040002c,
 				dataToWrite: [00, 00, 00, 00]
 			);
-			await _retroarchMemoryService.WriteByteArray(
+			await _memoryService.WriteByteArray(
 				address: 0x80400030,
 				dataToWrite: [00, 00, 00, 00]
 			);
@@ -103,7 +105,7 @@ public class LocationCheckService
 			memoryReadCommands.Add(memoryReadCommand);
 		}
 
-		var memoryDictionary = await _retroarchMemoryService.ReadMemoryToLongMulti(memoryReadCommands);
+		var memoryDictionary = await _memoryService.ReadMemoryToLongMulti(memoryReadCommands);
 
 		// make sure the game wasn't reset before using the memory that was read
 		var currentGameMode = await _gameModeService.GetCurrentGameMode();

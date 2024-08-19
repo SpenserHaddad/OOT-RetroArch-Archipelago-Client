@@ -1,14 +1,15 @@
 using System.Text;
+using OOT_AP_Client.Services.Interfaces;
 
-namespace OOT_AP_Client.Services;
+namespace OOT_AP_Client.OcarinaOfTime.Services;
 
 public class PlayerNameService
 {
-	private readonly RetroarchMemoryService _retroarchMemoryService;
+	private readonly IMemoryService _memoryService;
 
-	public PlayerNameService(RetroarchMemoryService retroarchMemoryService)
+	public PlayerNameService(IMemoryService memoryService)
 	{
-		_retroarchMemoryService = retroarchMemoryService;
+		_memoryService = memoryService;
 	}
 
 	public async Task WritePlayerName(byte index, string name)
@@ -46,11 +47,11 @@ public class PlayerNameService
 			bytesToWrite.Add(charByte ?? 0xDF);
 		}
 
-		await _retroarchMemoryService.WriteByteArray(
+		await _memoryService.WriteByteArray(
 			address: (uint)nameToWriteAddress,
 			dataToWrite: bytesToWrite.Take(4).ToArray()
 		);
-		await _retroarchMemoryService.WriteByteArray(
+		await _memoryService.WriteByteArray(
 			address: (uint)nameToWriteAddress + 4,
 			dataToWrite: bytesToWrite.Skip(4).Take(4).ToArray()
 		);

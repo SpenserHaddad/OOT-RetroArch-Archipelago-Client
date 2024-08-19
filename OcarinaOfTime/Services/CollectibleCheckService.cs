@@ -1,15 +1,17 @@
 using OOT_AP_Client.Models;
+using OOT_AP_Client.OcarinaOfTime.Models;
+using OOT_AP_Client.Services.Interfaces;
 using OOT_AP_Client.Utils;
 
-namespace OOT_AP_Client.Services;
+namespace OOT_AP_Client.OcarinaOfTime.Services;
 
 public class CollectibleCheckService
 {
-	private readonly RetroarchMemoryService _retroarchMemoryService;
+	private readonly IMemoryService _memoryService;
 
-	public CollectibleCheckService(RetroarchMemoryService retroarchMemoryService)
+	public CollectibleCheckService(IMemoryService memoryService)
 	{
-		_retroarchMemoryService = retroarchMemoryService;
+		_memoryService = memoryService;
 	}
 
 	public async Task<List<long>> GetAllCheckedCollectibleIds(
@@ -43,7 +45,7 @@ public class CollectibleCheckService
 			alreadyQueuedOffsets.Add(addressOfTargetByte);
 		}
 
-		var memoryDictionary = await _retroarchMemoryService.ReadMemoryToLongMulti(memoryReadCommands);
+		var memoryDictionary = await _memoryService.ReadMemoryToLongMulti(memoryReadCommands);
 
 		foreach (var collectibleFlagOffset in collectibleFlagOffsets)
 		{
