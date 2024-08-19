@@ -45,7 +45,7 @@ public class GameModeService
 
 				return GameModes["Normal Gameplay"];
 			}
-			case < 9 or 13:
+			case < 9 or 13 or 18 or 19:
 				return GameModes["Paused"];
 			case 9 or 0xB:
 				return GameModes["Dying Menu Start"];
