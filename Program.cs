@@ -178,8 +178,14 @@ while (true)
 // the idea would be that when processing the item queue, we can check against the local database, if the location is marked as checked there then that means we don't give the item, if it's not marked as checked then we do give the item
 // this would avoid giving duplicate items but mean we can receive local items when making a new save file
 
-static List<CollectibleFlagOffset> SlotDataCollectableFlagOffsetsToArray(JObject slotDataCollectibleFlagOffsets)
+static List<CollectibleFlagOffset> SlotDataCollectableFlagOffsetsToArray(JObject? slotDataCollectibleFlagOffsets)
 {
+	if (slotDataCollectibleFlagOffsets is null)
+	{
+		Console.WriteLine("SlotDataCollectibleFlagOffsets was null, this shouldn't happen!");
+		return [];
+	}
+
 	var convertedCollectibleFlagOffsets = new List<CollectibleFlagOffset>(slotDataCollectibleFlagOffsets.Count);
 
 	foreach (var flagOffsetData in slotDataCollectibleFlagOffsets)
