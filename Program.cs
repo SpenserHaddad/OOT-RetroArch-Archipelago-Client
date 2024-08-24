@@ -96,6 +96,8 @@ var wasPreviouslyInGame = false;
 
 while (true)
 {
+	await Task.Delay(100);
+
 	var currentGameMode = await gameModeService.GetCurrentGameMode();
 	if (!currentGameMode.IsInGame)
 	{
