@@ -80,6 +80,8 @@ Console.WriteLine($"DeathLink {(deathLinkEnabled ? "is" : "is not")} enabled.");
 await locationCheckService.InitializeMasterQuestHandling();
 await locationCheckService.InitializeBigPoesRequired();
 
+var clientSideReceivedItemsCount = -1;
+
 var isGameCompletionSent = false;
 
 if (deathLinkEnabled)
@@ -109,6 +111,7 @@ while (true)
 	{
 		wasPreviouslyInGame = true;
 		await WritePlayerNames(apSession: apSession, playerNameService: playerNameService);
+		clientSideReceivedItemsCount = -1;
 	}
 
 	var checkedLocationNames = await locationCheckService.GetAllCheckedLocationNames(slotSettings);
@@ -128,18 +131,22 @@ while (true)
 
 	apSession.Locations.CompleteLocationChecks(checkedLocationIds.Concat(checkedCollectibleIds).ToArray());
 
-	var localReceivedItemsCount = await receiveItemService.GetLocalReceivedItemIndex();
-
-	currentGameMode = await gameModeService.GetCurrentGameMode();
-	if (!currentGameMode.IsInGame)
+	var gameReceivedItemsCount = await receiveItemService.GetLocalReceivedItemIndex();
+	if (gameReceivedItemsCount > clientSideReceivedItemsCount)
 	{
-		continue;
-	}
+		currentGameMode = await gameModeService.GetCurrentGameMode();
+		if (!currentGameMode.IsInGame)
+		{
+			continue;
+		}
 
-	if (apSession.Items.Index > localReceivedItemsCount)
-	{
-		var itemToReceive = apSession.Items.AllItemsReceived[localReceivedItemsCount];
-		await receiveItemService.ReceiveItem(itemToReceive);
+		if (apSession.Items.Index > gameReceivedItemsCount)
+		{
+			clientSideReceivedItemsCount = gameReceivedItemsCount;
+
+			var itemToReceive = apSession.Items.AllItemsReceived[gameReceivedItemsCount];
+			await receiveItemService.ReceiveItem(itemToReceive);
+		}
 	}
 
 	await deathLinkService.ProcessDeathLink();
