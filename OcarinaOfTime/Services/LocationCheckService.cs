@@ -25,8 +25,8 @@ public class LocationCheckService
 
 	public async Task InitializeMasterQuestHandling()
 	{
-		var masterQuestTableAddress
-			= 0xA0400000 + (await _memoryService.Read32(0xA0400E9F) - 0x03480000);
+		var autotrackerContextAddress = await _memoryService.Read32(0xA040000C) - 0x80000000 + 0xA0000000;
+		var masterQuestTableAddress = autotrackerContextAddress + 0x02E;
 
 		var dungeonToDungeonId = new Dictionary<Area, byte>
 		{
@@ -44,11 +44,24 @@ public class LocationCheckService
 			{ Area.GanonsCastle, 0xD },
 		};
 
+		var memoryReadCommands = new List<MemoryReadCommand>();
+		foreach (var dungeonId in dungeonToDungeonId.Values)
+		{
+			var memoryReadCommand = new MemoryReadCommand()
+			{
+				Address = masterQuestTableAddress + dungeonId,
+				NumberOfBytes = 1
+			};
+			memoryReadCommands.Add(memoryReadCommand);
+		}
+
+		var memoryDictionary = await _memoryService.ReadMemoryToLongMulti(memoryReadCommands);
+
 		foreach (var (area, dungeonId) in dungeonToDungeonId)
 		{
 			// Currently this takes advantage of the fact that the MQ versions of each dungeon are right after the regular one in the enum
 			// Don't really like this though, should change it at some point
-			var isMasterQuest = await _memoryService.Read8(masterQuestTableAddress + dungeonId) == 1;
+			var isMasterQuest = memoryDictionary[masterQuestTableAddress + dungeonId] == 1;
 			var areaToSkip = isMasterQuest ? area : area + 1;
 
 			AreasToSkipChecking.Add(areaToSkip);
