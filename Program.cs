@@ -63,7 +63,9 @@ Console.WriteLine("Connected to Archipelago");
 var archipelagoDeathLinkService = apSession.CreateDeathLinkService();
 
 var slotData = apSession.DataStorage.GetSlotData();
-var slotSettings = new SlotSettings((long)slotData["shuffle_scrubs"] == 1);
+// Defaults to false if not found to support OOT but it's just master quest water temple
+var scrubsanityEnabled = slotData.ContainsKey("shuffle_scrubs") && (long)slotData["shuffle_scrubs"] == 1;
+var slotSettings = new SlotSettings(scrubsanityEnabled);
 // Reading from the 0x8000000 address range would be valid, it's the same memory as 0xA0000000, just keeping all accesses in 0xA0000000 for consistency
 var collectibleOverridesFlagsAddress
 	= await retroarchMemoryService.Read32(
