@@ -72,12 +72,12 @@ public class LocationCheckService
 	{
 		const long bigPoesRequiredAddress = 0xA0400EAD;
 		var bigPoesRequired = await _memoryService.Read8(bigPoesRequiredAddress);
-		bigPoePointsRequired = bigPoesRequired * 10;
+		bigPoePointsRequired = bigPoesRequired * 100;
 	}
 
 	// Going to want some sort of caching system for this so that it doesn't keep reporting every single location every single time
 	// Might be as simple as a hashmap somewhere that gets loaded with all received items, and stuff only gets sent to the server when it's not in that hashmap
-	public async Task<List<string>> GetAllCheckedLocationNames(SlotSettings slotSettings)
+	public async Task<List<string>> GetAllCheckedLocationNames(OOTClientSlotData ootClientSlotData)
 	{
 		var outgoingItemKey
 			= await _memoryService.ReadMemoryToByteArray(address: 0x8040002c, numberOfBytes: 4);
@@ -101,7 +101,8 @@ public class LocationCheckService
 			= AllLocationInformation
 				.AllLocations
 				.Where((location) => !AreasToSkipChecking.Contains(location.Area))
-				.Where((location) => location.Type != LocationType.Scrubsanity || slotSettings.ShuffleScrubs)
+				// Only include scrubsanity checks if it's enabled
+				.Where((location) => location.Type != LocationType.Scrubsanity || ootClientSlotData.ShuffleScrubs)
 				.ToImmutableArray();
 
 		var checkedMemoryAddresses = new HashSet<long>();
