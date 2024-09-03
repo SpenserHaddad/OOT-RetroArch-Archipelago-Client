@@ -235,7 +235,7 @@ public class OOTClient
 		var slotData = await _apSession.DataStorage.GetSlotDataAsync();
 
 		// Defaults to false if not found to support OOT but it's just master quest water temple
-		var scrubsanityEnabled = slotData.ContainsKey("shuffle_scrubs") && (long)slotData["shuffle_scrubs"] == 1;
+		var scrubsanityEnabled = slotData.ContainsKey("shuffle_scrubs") && (long)slotData["shuffle_scrubs"] >= 1;
 
 		// Reading from the 0x8000000 address range would be valid, it's the same memory as 0xA0000000, just keeping all accesses in 0xA0000000 for consistency
 		var collectibleOverridesFlagsAddress
