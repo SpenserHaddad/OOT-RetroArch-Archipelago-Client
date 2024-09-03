@@ -99,14 +99,14 @@ public class GameModeService
 	// TODO: Change the names to be an enum
 	private static readonly Dictionary<string, GameMode> GameModes = new GameMode[]
 	{
-		new(name: "N64 Logo", isInGame: false),
-		new(name: "Title Screen", isInGame: false),
-		new(name: "File Select", isInGame: false),
-		new(name: "Dying", isInGame: true),
-		new(name: "Cutscene", isInGame: true),
-		new(name: "Normal Gameplay", isInGame: true),
-		new(name: "Paused", isInGame: true),
-		new(name: "Dying Menu Start", isInGame: false),
-		new(name: "Dead", isInGame: false),
+		new() { Name = "N64 Logo", IsInGame = false },
+		new() { Name = "Title Screen", IsInGame = false },
+		new() { Name = "File Select", IsInGame = false },
+		new() { Name = "Dying", IsInGame = true },
+		new() { Name = "Cutscene", IsInGame = true },
+		new() { Name = "Normal Gameplay", IsInGame = true },
+		new() { Name = "Paused", IsInGame = true },
+		new() { Name = "Dying Menu Start", IsInGame = false },
+		new() { Name = "Dead", IsInGame = false },
 	}.ToDictionary((gameMode) => gameMode.Name);
 }
