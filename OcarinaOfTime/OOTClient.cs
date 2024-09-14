@@ -194,7 +194,7 @@ public class OOTClient
 		var cmdArgs = Environment.GetCommandLineArgs();
 
 		string GetSettingFromArgOrPrompt(int argIndex, string prompt, string defaultValue) {
-			if (cmdArgs.Length >= argIndex - 1) {
+			if (cmdArgs.Length > argIndex) {
 				return cmdArgs[argIndex];
 			}
 			else {
