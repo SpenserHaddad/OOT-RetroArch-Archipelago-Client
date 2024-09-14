@@ -191,34 +191,31 @@ public class OOTClient
 
 	private static OOTClientConnectionSettings PromptForConnectionSettings()
 	{
-		Console.WriteLine("Enter the Archipelago Server Hostname, default: archipelago.gg");
-		var apHostname = Console.ReadLine();
-		if (string.IsNullOrWhiteSpace(apHostname))
-		{
-			apHostname = "archipelago.gg";
+		var cmdArgs = Environment.GetCommandLineArgs();
+
+		string GetSettingFromArgOrPrompt(int argIndex, string prompt, string defaultValue) {
+			if (cmdArgs.Length >= argIndex - 1) {
+				return cmdArgs[argIndex];
+			}
+			else {
+				Console.WriteLine($"{prompt}, default: {defaultValue}");
+				var input = Console.ReadLine();
+				if (string.IsNullOrWhiteSpace(input)) {
+					return defaultValue;
+				}
+				else {
+					return input;
+				}
+			}
 		}
 
-		Console.WriteLine("Enter the Archipelago Server port, default: 38281");
-		var apPortString = Console.ReadLine();
-		var apPort = string.IsNullOrWhiteSpace(apPortString) ? 38281 : int.Parse(apPortString);
-
-		Console.WriteLine("Enter the Slot Name, default: Player");
-		var slotName = Console.ReadLine();
-		if (string.IsNullOrEmpty(slotName))
-		{
-			slotName = "Player";
-		}
-
-		Console.WriteLine("Enter the Retroarch Hostname, default: localhost");
-		var retroarchHostname = Console.ReadLine();
-		if (string.IsNullOrEmpty(retroarchHostname))
-		{
-			retroarchHostname = "localhost";
-		}
-
-		Console.WriteLine("Enter the Retroarch Port, default: 55355");
-		var retroarchPortString = Console.ReadLine();
-		var retroarchPort = string.IsNullOrWhiteSpace(retroarchPortString) ? 55355 : int.Parse(retroarchPortString);
+		string apHostname = GetSettingFromArgOrPrompt(1,"Enter the Archipelago Server Hostname", "archipelago.gg");
+		string apPortString = GetSettingFromArgOrPrompt(2, "Enter the Archipelago Server port", "38281");
+		int apPort = int.Parse(apPortString);
+		string slotName = GetSettingFromArgOrPrompt(3, "Enter the Slot Name", "Player");
+		string retroarchHostname = GetSettingFromArgOrPrompt(4, "Enter the Retroarch Hostname", "localhost");
+		string retroarchPortString = GetSettingFromArgOrPrompt(5, "Enter the Retroarch Port", "55355");
+		int retroarchPort = int.Parse(retroarchPortString);
 
 		return new OOTClientConnectionSettings
 		{
